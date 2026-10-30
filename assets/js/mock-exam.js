@@ -160,6 +160,10 @@
         });
       });
       var chosen = shuffle(usable).slice(0, data.scenarioCount);
+      // 1シナリオあたりの上限(公式: 60問 ÷ 4シナリオ = 15問)。問題プールが多くても公式の問題数に収める。
+      var perScenario = data.officialQuestionCount
+        ? Math.ceil(data.officialQuestionCount / data.scenarioCount)
+        : Infinity;
       var out = [];
       chosen.forEach(function (sc) {
         out = out.concat(
@@ -167,7 +171,7 @@
             data.questions.filter(function (q) {
               return q.scenario === sc.id;
             })
-          )
+          ).slice(0, perScenario)
         );
       });
       return out;

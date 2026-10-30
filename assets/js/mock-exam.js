@@ -88,6 +88,28 @@
     + "#mock-exam-app .me-badge-incorrect { background: #ffebe9; color: #82071e; }\n"
     + "#mock-exam-app .me-badge-unanswered { background: #eaeef2; color: #57606a; }\n"
     + "#mock-exam-app .me-explanation { margin: 0; color: #24292f; }\n"
+    + "#mock-exam-app .me-expl-block { margin: 0.55rem 0 0; color: #24292f; }\n"
+    + "#mock-exam-app .me-expl-label { display: inline-block; font-size: 0.78rem; font-weight: 700; padding: 0.05rem 0.5rem; border-radius: 999px; margin-right: 0.4rem; background: #ddf4ff; color: #0550ae; }\n"
+    + "#mock-exam-app .me-expl-label.runner { background: #fff8c5; color: #7d4e00; }\n"
+    + "#mock-exam-app .me-expl-label.rest { background: #eaeef2; color: #57606a; }\n"
+    + "#mock-exam-app .me-expl-label.deep { background: #dafbe1; color: #116329; }\n"
+    + "#mock-exam-app .me-expl-rest { margin: 0.3rem 0 0 1rem; padding: 0; }\n"
+    + "#mock-exam-app .me-expl-rest li { margin: 0.2rem 0; }\n"
+    + "#mock-exam-app .me-fig { margin: 0.8rem 0 0; padding: 0.7rem 0.8rem; border: 1px solid #d0d7de; border-radius: 8px; background: #f6f8fa; }\n"
+    + "#mock-exam-app .me-fig-cap { font-size: 0.82rem; font-weight: 700; color: #57606a; margin: 0 0 0.5rem; }\n"
+    + "#mock-exam-app .me-fig-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.3rem 0.2rem; }\n"
+    + "#mock-exam-app .me-fig-node { border: 1px solid #afb8c1; border-radius: 6px; background: #fff; padding: 0.35rem 0.6rem; font-size: 0.85rem; min-width: 7rem; max-width: 14rem; }\n"
+    + "#mock-exam-app .me-fig-node small { display: block; color: #57606a; font-size: 0.75rem; margin-top: 0.1rem; }\n"
+    + "#mock-exam-app .me-fig-node.key { border-color: #0969da; background: #ddf4ff; }\n"
+    + "#mock-exam-app .me-fig-node.ok { border-color: #1a7f37; background: #dafbe1; }\n"
+    + "#mock-exam-app .me-fig-node.bad { border-color: #cf222e; background: #ffebe9; }\n"
+    + "#mock-exam-app .me-fig-arrow { align-self: center; color: #57606a; font-weight: 700; padding: 0 0.1rem; }\n"
+    + "#mock-exam-app .me-fig-branch { margin-top: 0.4rem; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: stretch; }\n"
+    + "#mock-exam-app .me-fig-back { margin-top: 0.4rem; font-size: 0.8rem; color: #57606a; }\n"
+    + "#mock-exam-app .me-fig-table { border-collapse: collapse; width: 100%; font-size: 0.82rem; background: #fff; }\n"
+    + "#mock-exam-app .me-fig-table th, #mock-exam-app .me-fig-table td { border: 1px solid #d0d7de; padding: 0.3rem 0.5rem; text-align: left; vertical-align: top; }\n"
+    + "#mock-exam-app .me-fig-table th { background: #eaeef2; }\n"
+    + "#mock-exam-app .me-fig-table td.key { background: #ddf4ff; font-weight: 600; }\n"
     + "@media (max-width: 640px) {\n"
     + "  #mock-exam-app .me-intro dl { grid-template-columns: 1fr; }\n"
     + "}\n";
@@ -195,6 +217,10 @@
         options: options,
         correct: q.correct.slice(),
         explanation: q.explanation,
+        runnerUp: q.runnerUp,
+        others: q.others,
+        deep: q.deep,
+        fig: q.fig,
       };
     });
     return questions;
@@ -404,7 +430,74 @@
     var badgeText = !q.answered ? "未解答" : q.isCorrect ? "正解" : "不正解";
     fb.innerHTML =
       '<span class="me-feedback-badge ' + badgeClass + '">' + badgeText + "</span>"
-      + '<p class="me-explanation"><strong>解説: </strong>' + formatText(q.explanation) + "</p>";
+      + explanationHtml(q);
+  }
+
+  // 解説: 正答の理由 / 次点 / ほかの選択肢 / 見分け方 / 図。
+  // 選択肢は毎回シャッフルされるので、データ中の元の文字(origLetter)を表示上の文字に直して示す。
+  function displayLetterOf(q, origLetter) {
+    for (var i = 0; i < q.options.length; i++) {
+      if (q.options[i].origLetter === origLetter) return String.fromCharCode(65 + i);
+    }
+    return origLetter;
+  }
+
+  function figHtml(fig) {
+    if (!fig) return "";
+    function node(n) {
+      return '<div class="me-fig-node ' + escapeHtml(n.tone || "") + '">' + formatText(n.t)
+        + (n.s ? "<small>" + formatText(n.s) + "</small>" : "") + "</div>";
+    }
+    var body = "";
+    if (fig.kind === "table") {
+      body = '<table class="me-fig-table"><thead><tr>'
+        + fig.head.map(function (h) { return "<th>" + formatText(h) + "</th>"; }).join("")
+        + "</tr></thead><tbody>"
+        + fig.rows.map(function (r) {
+          // セルが {t, key:true} のオブジェクトなら、正答の行として強調する
+          return "<tr>" + r.map(function (c) {
+            var isObj = typeof c === "object";
+            return "<td" + (isObj ? ' class="key"' : "") + ">" + formatText(isObj ? c.t : c) + "</td>";
+          }).join("") + "</tr>";
+        }).join("")
+        + "</tbody></table>";
+    } else {
+      body = '<div class="me-fig-row">'
+        + fig.steps.map(function (n, i) {
+          return (i ? '<span class="me-fig-arrow">→</span>' : "") + node(n);
+        }).join("")
+        + "</div>";
+      if (fig.end) {
+        body += '<div class="me-fig-branch"><span class="me-fig-arrow">↳</span>' + fig.end.map(node).join("") + "</div>";
+      }
+      if (fig.back) body += '<div class="me-fig-back">↺ ' + formatText(fig.back) + "</div>";
+    }
+    return '<div class="me-fig"><p class="me-fig-cap">図: ' + formatText(fig.cap) + "</p>" + body + "</div>";
+  }
+
+  function explanationHtml(q) {
+    var html = '<p class="me-explanation"><strong>解説: </strong>' + formatText(q.explanation) + "</p>";
+    if (q.runnerUp) {
+      html += '<p class="me-expl-block"><span class="me-expl-label runner">次点: '
+        + displayLetterOf(q, q.runnerUp.letter) + "</span>" + formatText(q.runnerUp.why) + "</p>";
+    }
+    if (q.others) {
+      var items = Object.keys(q.others)
+        .sort(function (a, b) {
+          return displayLetterOf(q, a) < displayLetterOf(q, b) ? -1 : 1;
+        })
+        .map(function (k) {
+          return "<li><strong>" + displayLetterOf(q, k) + "</strong>: " + formatText(q.others[k]) + "</li>";
+        })
+        .join("");
+      if (items) {
+        html += '<p class="me-expl-block"><span class="me-expl-label rest">ほかの選択肢</span></p><ul class="me-expl-rest">' + items + "</ul>";
+      }
+    }
+    if (q.deep) {
+      html += '<p class="me-expl-block"><span class="me-expl-label deep">見分け方</span>' + formatText(q.deep) + "</p>";
+    }
+    return html + figHtml(q.fig);
   }
 
   function gradeExam(root, data, questions) {

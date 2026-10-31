@@ -70,6 +70,12 @@
     + "#mock-exam-app .me-rate.me-rate-low .me-rate-bar span { background: #cf222e; }\n"
     + "#mock-exam-app .me-rate-num { font-weight: 700; min-width: 2.6rem; text-align: right; }\n"
     + "#mock-exam-app .me-rate.me-rate-low .me-rate-num { color: #cf222e; }\n"
+    + "#mock-exam-app .me-review { margin: 0 0 1.2rem; font-size: 0.9rem; }\n"
+    + "#mock-exam-app .me-review-row { margin: 0.3rem 0; }\n"
+    + "#mock-exam-app .me-review a { display: inline-block; margin: 0.15rem 0.2rem 0.15rem 0; padding: 0 0.55rem; border-radius: 999px; text-decoration: none; border: 1px solid; }\n"
+    + "#mock-exam-app .me-review a.me-rv-wrong { background: #ffebe9; border-color: #cf222e; color: #82071e; }\n"
+    + "#mock-exam-app .me-review a.me-rv-skip { background: #eaeef2; border-color: #8c959f; color: #24292f; }\n"
+    + "#mock-exam-app .me-review a.me-rv-flag { background: #fff8c5; border-color: #bf8700; color: #7d4e00; }\n"
     + "#mock-exam-app .me-weak-note { font-size: 0.85rem; color: #57606a; margin: -0.6rem 0 1.2rem; }\n"
     + "#mock-exam-app .me-scenario { border-left: 4px solid #0969da; background: #f6f8fa; border-radius: 6px; padding: 0.7rem 1rem; margin: 1.4rem 0 0.8rem; }\n"
     + "#mock-exam-app .me-scenario p { margin: 0.3rem 0 0; font-size: 0.92rem; }\n"
@@ -564,10 +570,15 @@
     var correctCount = 0;
     var domainStats = {};
     var scenarioStats = {};
+    var review = { wrong: [], skipped: [], flagged: [] };
 
     questions.forEach(function (q) {
       var card = root.querySelector('.me-question[data-qid="' + q.id + '"]');
       lockQuestion(q, card); // 未確定の問題は、その時点の選択で確定する
+      var no = card.getAttribute("data-no");
+      if (!q.answered) review.skipped.push(no);
+      else if (!q.isCorrect) review.wrong.push(no);
+      if (card.classList.contains("me-flagged-card")) review.flagged.push(no);
       if (!domainStats[q.domainLabel]) domainStats[q.domainLabel] = { correct: 0, total: 0, link: q.domainLink };
       domainStats[q.domainLabel].total++;
       if (q.scenario) {
@@ -581,7 +592,7 @@
       }
     });
 
-    return { correctCount: correctCount, total: questions.length, domainStats: domainStats, scenarioStats: scenarioStats };
+    return { correctCount: correctCount, total: questions.length, domainStats: domainStats, scenarioStats: scenarioStats, review: review };
   }
 
   function renderResultPanel(root, data, result) {
@@ -629,8 +640,38 @@
     panel.insertAdjacentElement("afterend", table);
     var note = document.createElement("p");
     note.className = "me-weak-note";
-    note.textContent = "赤い分野は、合格ライン(正答率 " + Math.round(passRate * 100) + "% 相当)を下回っています。右の「学習ノートを開く」から復習できます。";
+    var weakest = Object.keys(result.domainStats)
+      .filter(function (k) { return result.domainStats[k].total; })
+      .sort(function (a, b) {
+        var x = result.domainStats[a], y = result.domainStats[b];
+        return x.correct / x.total - y.correct / y.total;
+      })[0];
+    note.textContent = "赤い分野は、合格ライン(正答率 " + Math.round(passRate * 100) + "% 相当)を下回っています。右の「学習ノートを開く」から復習できます。"
+      + (weakest ? "最も正答率が低い分野: " + weakest + "(" + result.domainStats[weakest].correct + " / " + result.domainStats[weakest].total + ")。" : "");
     table.insertAdjacentElement("afterend", note);
+
+    // 見直す問題の一覧(クリックでその問題へ移動)。フラグを付けた問題も含める
+    var rv = result.review;
+    function chips(nos, cls) {
+      return nos.map(function (n) { return '<a class="' + cls + '" href="#me-q' + n + '">問' + n + "</a>"; }).join("");
+    }
+    var rvHtml =
+      (rv.wrong.length ? '<div class="me-review-row"><strong>不正解 ' + rv.wrong.length + "問:</strong> " + chips(rv.wrong, "me-rv-wrong") + "</div>" : "")
+      + (rv.skipped.length ? '<div class="me-review-row"><strong>未解答 ' + rv.skipped.length + "問:</strong> " + chips(rv.skipped, "me-rv-skip") + "</div>" : "")
+      + (rv.flagged.length ? '<div class="me-review-row"><strong>フラグ ' + rv.flagged.length + "問:</strong> " + chips(rv.flagged, "me-rv-flag") + "</div>" : "");
+    if (rvHtml) {
+      var rvBox = document.createElement("div");
+      rvBox.className = "me-review";
+      rvBox.innerHTML = rvHtml;
+      rvBox.addEventListener("click", function (e) {
+        var a = e.target.closest("a");
+        if (!a) return;
+        e.preventDefault();
+        var card = root.querySelector(a.getAttribute("href"));
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      note.insertAdjacentElement("afterend", rvBox);
+    }
 
     // シナリオ形式の試験(Architect – Foundations)は、シナリオ別の正答率も示す
     if (data.scenarios && Object.keys(result.scenarioStats).length) {

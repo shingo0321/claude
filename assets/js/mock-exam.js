@@ -563,19 +563,25 @@
   function gradeExam(root, data, questions) {
     var correctCount = 0;
     var domainStats = {};
+    var scenarioStats = {};
 
     questions.forEach(function (q) {
       var card = root.querySelector('.me-question[data-qid="' + q.id + '"]');
       lockQuestion(q, card); // 未確定の問題は、その時点の選択で確定する
       if (!domainStats[q.domainLabel]) domainStats[q.domainLabel] = { correct: 0, total: 0, link: q.domainLink };
       domainStats[q.domainLabel].total++;
+      if (q.scenario) {
+        if (!scenarioStats[q.scenario]) scenarioStats[q.scenario] = { correct: 0, total: 0 };
+        scenarioStats[q.scenario].total++;
+        if (q.isCorrect) scenarioStats[q.scenario].correct++;
+      }
       if (q.isCorrect) {
         domainStats[q.domainLabel].correct++;
         correctCount++;
       }
     });
 
-    return { correctCount: correctCount, total: questions.length, domainStats: domainStats };
+    return { correctCount: correctCount, total: questions.length, domainStats: domainStats, scenarioStats: scenarioStats };
   }
 
   function renderResultPanel(root, data, result) {
@@ -585,17 +591,21 @@
 
     // 合格ライン(正答率換算)を下回る分野は赤で示す
     var passRate = (data.passScore - data.scoreMin) / (data.scoreMax - data.scoreMin);
+    function rateCell(s) {
+      var rate = s.total ? Math.round((s.correct / s.total) * 100) : 0;
+      var low = s.total && s.correct / s.total < passRate;
+      return (
+        '<div class="me-rate' + (low ? " me-rate-low" : "") + '">'
+        + '<div class="me-rate-bar"><span style="width:' + rate + '%"></span></div>'
+        + '<span class="me-rate-num">' + (s.total ? rate + "%" : "-") + "</span></div>"
+      );
+    }
     var domainRows = Object.keys(result.domainStats)
       .sort()
       .map(function (label) {
         var s = result.domainStats[label];
         var w = data.domainWeights ? data.domainWeights[domainKey(label)] : null;
-        var rate = s.total ? Math.round((s.correct / s.total) * 100) : 0;
-        var low = s.total && s.correct / s.total < passRate;
-        var rateHtml =
-          '<div class="me-rate' + (low ? " me-rate-low" : "") + '">'
-          + '<div class="me-rate-bar"><span style="width:' + rate + '%"></span></div>'
-          + '<span class="me-rate-num">' + (s.total ? rate + "%" : "-") + "</span></div>";
+        var rateHtml = rateCell(s);
         return (
           "<tr><td>" + escapeHtml(label) + "</td><td>" + s.correct + " / " + s.total + "</td><td>" + rateHtml + "</td>"
           + (data.domainWeights ? "<td>" + (w != null ? w + "%" : "-") + "</td>" : "")
@@ -621,6 +631,21 @@
     note.className = "me-weak-note";
     note.textContent = "赤い分野は、合格ライン(正答率 " + Math.round(passRate * 100) + "% 相当)を下回っています。右の「学習ノートを開く」から復習できます。";
     table.insertAdjacentElement("afterend", note);
+
+    // シナリオ形式の試験(Architect – Foundations)は、シナリオ別の正答率も示す
+    if (data.scenarios && Object.keys(result.scenarioStats).length) {
+      var scRows = data.scenarios
+        .filter(function (sc) { return result.scenarioStats[sc.id]; })
+        .map(function (sc) {
+          var st = result.scenarioStats[sc.id];
+          return "<tr><td>" + escapeHtml(sc.title) + "</td><td>" + st.correct + " / " + st.total + "</td><td>" + rateCell(st) + "</td></tr>";
+        })
+        .join("");
+      var scTable = document.createElement("table");
+      scTable.className = "me-domain-table";
+      scTable.innerHTML = "<thead><tr><th>シナリオ</th><th>正答数</th><th>正答率</th></tr></thead><tbody>" + scRows + "</tbody>";
+      note.insertAdjacentElement("afterend", scTable);
+    }
 
     panel.querySelector("#me-retry-btn").addEventListener("click", function () {
       startAttempt(root, data);

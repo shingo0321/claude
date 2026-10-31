@@ -80,6 +80,13 @@
     + "#mock-exam-app .me-option-ja { display: block; }\n"
     + "#mock-exam-app .me-option.me-correct { border-color: #1a7f37; background: #dafbe1; }\n"
     + "#mock-exam-app .me-option.me-incorrect { border-color: #cf222e; background: #ffebe9; }\n"
+    + "#mock-exam-app .me-flag-btn { margin-left: auto; font-size: 0.8rem; border: 1px solid #d0d7de; background: #fff; color: #57606a; border-radius: 999px; padding: 0.1rem 0.7rem; cursor: pointer; }\n"
+    + "#mock-exam-app .me-flag-btn.me-flagged { background: #fff8c5; border-color: #bf8700; color: #7d4e00; font-weight: 700; }\n"
+    + "#mock-exam-app .me-question.me-flagged-card { border-color: #bf8700; box-shadow: 0 0 0 1px #bf8700; }\n"
+    + "#mock-exam-app .me-strike-btn { margin-left: auto; flex: none; font-size: 0.75rem; line-height: 1; border: 1px solid #d0d7de; background: #fff; color: #57606a; border-radius: 6px; padding: 0.25rem 0.45rem; cursor: pointer; }\n"
+    + "#mock-exam-app .me-option.me-struck .me-option-text { text-decoration: line-through; color: #8c959f; }\n"
+    + "#mock-exam-app .me-option.me-struck .me-strike-btn { background: #eaeef2; color: #24292f; }\n"
+    + "#mock-exam-app .me-flag-list a { display: inline-block; margin-left: 0.3rem; padding: 0 0.45rem; border-radius: 999px; background: #fff8c5; border: 1px solid #bf8700; color: #7d4e00; font-size: 0.82rem; text-decoration: none; }\n"
     + "#mock-exam-app .me-submit-wrap { margin-top: 0.6rem; }\n"
     + "#mock-exam-app .me-btn:disabled { background: #8c959f; cursor: not-allowed; }\n"
     + "#mock-exam-app .me-feedback { margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px dashed #d0d7de; }\n"
@@ -272,6 +279,7 @@
       '<div class="me-panel" id="me-panel">'
       + '<div class="me-panel-item">残り時間: <strong class="me-timer" id="me-timer">' + formatClock(timeLimitFor(data, questions.length) * 60) + "</strong></div>"
       + '<div class="me-panel-item" id="me-progress">解答済み: <strong>0</strong> / ' + questions.length + "</div>"
+      + '<div class="me-panel-item me-flag-list" id="me-flag-list" hidden>フラグ:<span></span></div>'
       + '<div class="me-panel-spacer"></div>'
       + '<button type="button" class="me-btn" id="me-grade-btn">試験を終了して結果を見る</button>'
       + "</div>";
@@ -304,6 +312,7 @@
               + '<span class="me-option-text">'
               + '<span class="me-option-ja">' + displayLetter + ". " + formatText(o.ja) + "</span>"
               + "</span>"
+              + '<button type="button" class="me-strike-btn" title="この選択肢を消去(取り消し線)">取消</button>'
               + "</label>"
             );
           })
@@ -311,11 +320,12 @@
 
         return (
           scenarioHtml
-          + '<div class="me-question" data-qid="' + q.id + '">'
+          + '<div class="me-question" id="me-q' + (idx + 1) + '" data-no="' + (idx + 1) + '" data-qid="' + q.id + '">'
           + '<div class="me-question-head">'
           + '<span class="me-qnum">問' + (idx + 1) + "</span>"
           + '<a class="me-domain-tag" href="' + escapeHtml(q.domainLink) + '" target="_blank" rel="noopener">' + escapeHtml(q.domainLabel) + "</a>"
           + multiHint
+          + '<button type="button" class="me-flag-btn" title="あとで見直す問題にフラグを付ける">⚑ フラグ</button>'
           + "</div>"
           + '<div class="me-stem">'
           + '<p class="me-stem-ja">' + formatText(q.stemJa) + "</p>"
@@ -361,6 +371,43 @@
       } else {
         var n = f.card.querySelectorAll("input:checked").length;
         f.card.querySelector(".me-submit-q").disabled = n !== f.q.correct.length;
+      }
+    });
+    var flagList = root.querySelector("#me-flag-list");
+    function updateFlags() {
+      var nos = Array.prototype.map.call(area.querySelectorAll(".me-flagged-card"), function (c) {
+        return c.getAttribute("data-no");
+      });
+      flagList.hidden = nos.length === 0;
+      flagList.querySelector("span").innerHTML = nos
+        .map(function (n) { return '<a href="#me-q' + n + '">問' + n + "</a>"; })
+        .join("");
+    }
+    flagList.addEventListener("click", function (e) {
+      var a = e.target.closest("a");
+      if (!a) return;
+      e.preventDefault();
+      var card = area.querySelector(a.getAttribute("href"));
+      if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    // フラグ(見直し用の目印)と選択肢の取り消し線。どちらも採点には影響しない。
+    area.addEventListener("click", function (e) {
+      var strike = e.target.closest && e.target.closest(".me-strike-btn");
+      if (strike) {
+        e.preventDefault();
+        var label = strike.closest(".me-option");
+        var fs = findQuestion(strike);
+        if (fs && !fs.q.locked) label.classList.toggle("me-struck");
+        return;
+      }
+      var flagBtn = e.target.closest && e.target.closest(".me-flag-btn");
+      if (flagBtn) {
+        var card = flagBtn.closest(".me-question");
+        var on = !card.classList.contains("me-flagged-card");
+        card.classList.toggle("me-flagged-card", on);
+        flagBtn.classList.toggle("me-flagged", on);
+        flagBtn.textContent = on ? "⚑ フラグ済み" : "⚑ フラグ";
+        updateFlags();
       }
     });
     area.addEventListener("click", function (e) {
@@ -414,6 +461,8 @@
       var input = label.querySelector("input");
       input.disabled = true;
       label.style.cursor = "default";
+      var sb = label.querySelector(".me-strike-btn");
+      if (sb) sb.hidden = true;
       var letter = label.getAttribute("data-letter");
       if (correctSet.indexOf(letter) !== -1) {
         label.classList.add("me-correct");

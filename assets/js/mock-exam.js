@@ -64,6 +64,13 @@
     + "#mock-exam-app .me-domain-table { width: 100%; border-collapse: collapse; margin: 0 0 1.2rem; font-size: 0.9rem; }\n"
     + "#mock-exam-app .me-domain-table th, #mock-exam-app .me-domain-table td { border: 1px solid #d0d7de; padding: 0.35rem 0.6rem; text-align: left; }\n"
     + "#mock-exam-app .me-domain-table th { background: #f6f8fa; }\n"
+    + "#mock-exam-app .me-rate { display: flex; align-items: center; gap: 0.5rem; min-width: 9rem; }\n"
+    + "#mock-exam-app .me-rate-bar { flex: 1; height: 0.6rem; border-radius: 999px; background: #eaeef2; overflow: hidden; }\n"
+    + "#mock-exam-app .me-rate-bar span { display: block; height: 100%; background: #1a7f37; }\n"
+    + "#mock-exam-app .me-rate.me-rate-low .me-rate-bar span { background: #cf222e; }\n"
+    + "#mock-exam-app .me-rate-num { font-weight: 700; min-width: 2.6rem; text-align: right; }\n"
+    + "#mock-exam-app .me-rate.me-rate-low .me-rate-num { color: #cf222e; }\n"
+    + "#mock-exam-app .me-weak-note { font-size: 0.85rem; color: #57606a; margin: -0.6rem 0 1.2rem; }\n"
     + "#mock-exam-app .me-scenario { border-left: 4px solid #0969da; background: #f6f8fa; border-radius: 6px; padding: 0.7rem 1rem; margin: 1.4rem 0 0.8rem; }\n"
     + "#mock-exam-app .me-scenario p { margin: 0.3rem 0 0; font-size: 0.92rem; }\n"
     + "#mock-exam-app .me-question { border: 1px solid #d0d7de; border-radius: 10px; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }\n"
@@ -576,14 +583,21 @@
     var scaled = Math.round(data.scoreMin + pct * (data.scoreMax - data.scoreMin));
     var pass = scaled >= data.passScore;
 
+    // 合格ライン(正答率換算)を下回る分野は赤で示す
+    var passRate = (data.passScore - data.scoreMin) / (data.scoreMax - data.scoreMin);
     var domainRows = Object.keys(result.domainStats)
       .sort()
       .map(function (label) {
         var s = result.domainStats[label];
         var w = data.domainWeights ? data.domainWeights[domainKey(label)] : null;
-        var pctText = s.total ? Math.round((s.correct / s.total) * 100) + "%" : "-";
+        var rate = s.total ? Math.round((s.correct / s.total) * 100) : 0;
+        var low = s.total && s.correct / s.total < passRate;
+        var rateHtml =
+          '<div class="me-rate' + (low ? " me-rate-low" : "") + '">'
+          + '<div class="me-rate-bar"><span style="width:' + rate + '%"></span></div>'
+          + '<span class="me-rate-num">' + (s.total ? rate + "%" : "-") + "</span></div>";
         return (
-          "<tr><td>" + escapeHtml(label) + "</td><td>" + s.correct + " / " + s.total + "</td><td>" + pctText + "</td>"
+          "<tr><td>" + escapeHtml(label) + "</td><td>" + s.correct + " / " + s.total + "</td><td>" + rateHtml + "</td>"
           + (data.domainWeights ? "<td>" + (w != null ? w + "%" : "-") + "</td>" : "")
           + '<td><a href="' + escapeHtml(s.link) + '" target="_blank" rel="noopener">学習ノートを開く</a></td>'
           + "</tr>"
@@ -603,6 +617,10 @@
     table.className = "me-domain-table";
     table.innerHTML = "<thead><tr><th>出題分野</th><th>正答数</th><th>正答率</th>" + (data.domainWeights ? "<th>公式の配点比率</th>" : "") + "<th>学習コンテンツ</th></tr></thead><tbody>" + domainRows + "</tbody>";
     panel.insertAdjacentElement("afterend", table);
+    var note = document.createElement("p");
+    note.className = "me-weak-note";
+    note.textContent = "赤い分野は、合格ライン(正答率 " + Math.round(passRate * 100) + "% 相当)を下回っています。右の「学習ノートを開く」から復習できます。";
+    table.insertAdjacentElement("afterend", note);
 
     panel.querySelector("#me-retry-btn").addEventListener("click", function () {
       startAttempt(root, data);

@@ -83,9 +83,12 @@
     + "#mock-exam-app .me-flag-btn { margin-left: auto; font-size: 0.8rem; border: 1px solid #d0d7de; background: #fff; color: #57606a; border-radius: 999px; padding: 0.1rem 0.7rem; cursor: pointer; }\n"
     + "#mock-exam-app .me-flag-btn.me-flagged { background: #fff8c5; border-color: #bf8700; color: #7d4e00; font-weight: 700; }\n"
     + "#mock-exam-app .me-question.me-flagged-card { border-color: #bf8700; box-shadow: 0 0 0 1px #bf8700; }\n"
-    + "#mock-exam-app .me-strike-btn { margin-left: auto; flex: none; font-size: 0.75rem; line-height: 1; border: 1px solid #d0d7de; background: #fff; color: #57606a; border-radius: 6px; padding: 0.25rem 0.45rem; cursor: pointer; }\n"
-    + "#mock-exam-app .me-option.me-struck .me-option-text { text-decoration: line-through; color: #8c959f; }\n"
-    + "#mock-exam-app .me-option.me-struck .me-strike-btn { background: #eaeef2; color: #24292f; }\n"
+    + "#mock-exam-app .me-opt-row { display: flex; gap: 0.9rem; align-items: stretch; }\n"
+    + "#mock-exam-app .me-opt-row .me-option { flex: 1; min-width: 0; }\n"
+    + "#mock-exam-app .me-strike-btn { flex: none; width: 3.6rem; font-size: 0.8rem; line-height: 1.2; border: 1px solid #d0d7de; background: #fff; color: #57606a; border-radius: 8px; padding: 0; cursor: pointer; }\n"
+    + "#mock-exam-app .me-strike-btn:hover { background: #f6f8fa; }\n"
+    + "#mock-exam-app .me-opt-row.me-struck .me-option-text { text-decoration: line-through; color: #8c959f; }\n"
+    + "#mock-exam-app .me-opt-row.me-struck .me-strike-btn { background: #eaeef2; color: #24292f; font-weight: 700; }\n"
     + "#mock-exam-app .me-flag-list a { display: inline-block; margin-left: 0.3rem; padding: 0 0.45rem; border-radius: 999px; background: #fff8c5; border: 1px solid #bf8700; color: #7d4e00; font-size: 0.82rem; text-decoration: none; }\n"
     + "#mock-exam-app .me-submit-wrap { margin-top: 0.6rem; }\n"
     + "#mock-exam-app .me-btn:disabled { background: #8c959f; cursor: not-allowed; }\n"
@@ -307,13 +310,15 @@
           .map(function (o, oIdx) {
             var displayLetter = String.fromCharCode(65 + oIdx);
             return (
-              '<label class="me-option" data-letter="' + o.origLetter + '">'
+              '<div class="me-opt-row">'
+              + '<label class="me-option" data-letter="' + o.origLetter + '">'
               + '<input type="' + inputType + '" name="q-' + q.id + '" value="' + o.origLetter + '">'
               + '<span class="me-option-text">'
               + '<span class="me-option-ja">' + displayLetter + ". " + formatText(o.ja) + "</span>"
               + "</span>"
-              + '<button type="button" class="me-strike-btn" title="この選択肢を消去(取り消し線)">取消</button>'
               + "</label>"
+              + '<button type="button" class="me-strike-btn" title="この選択肢を消去(取り消し線)">取消</button>'
+              + "</div>"
             );
           })
           .join("");
@@ -395,9 +400,8 @@
       var strike = e.target.closest && e.target.closest(".me-strike-btn");
       if (strike) {
         e.preventDefault();
-        var label = strike.closest(".me-option");
         var fs = findQuestion(strike);
-        if (fs && !fs.q.locked) label.classList.toggle("me-struck");
+        if (fs && !fs.q.locked) strike.closest(".me-opt-row").classList.toggle("me-struck");
         return;
       }
       var flagBtn = e.target.closest && e.target.closest(".me-flag-btn");
@@ -461,7 +465,7 @@
       var input = label.querySelector("input");
       input.disabled = true;
       label.style.cursor = "default";
-      var sb = label.querySelector(".me-strike-btn");
+      var sb = label.parentNode.querySelector(".me-strike-btn");
       if (sb) sb.hidden = true;
       var letter = label.getAttribute("data-letter");
       if (correctSet.indexOf(letter) !== -1) {

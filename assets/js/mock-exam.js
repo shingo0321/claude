@@ -156,47 +156,163 @@
     return Math.max(1, Math.ceil((data.timeLimitMinutes * count) / official));
   }
 
+  // 配点比率から、各分野の出題数を最大剰余法で配分する。分野の問題数が足りない分は、余裕のある分野へ回す。
+  function allocateByWeights(weights, total, avail) {
+    var keys = Object.keys(weights);
+    var target = {};
+    var alloc = {};
+    var sum = 0;
+    keys.forEach(function (k) {
+      target[k] = (weights[k] * total) / 100;
+      alloc[k] = Math.floor(target[k]);
+      sum += alloc[k];
+    });
+    keys
+      .slice()
+      .sort(function (a, b) {
+        return target[b] - alloc[b] - (target[a] - alloc[a]);
+      })
+      .forEach(function (k) {
+        if (sum < total) {
+          alloc[k]++;
+          sum++;
+        }
+      });
+    var short = 0;
+    keys.forEach(function (k) {
+      var have = avail[k] || 0;
+      if (alloc[k] > have) {
+        short += alloc[k] - have;
+        alloc[k] = have;
+      }
+    });
+    while (short > 0) {
+      var best = null;
+      keys.forEach(function (k) {
+        if (alloc[k] < (avail[k] || 0) && (best === null || target[k] - alloc[k] > target[best] - alloc[best])) best = k;
+      });
+      if (best === null) break;
+      alloc[best]++;
+      short--;
+    }
+    var gap = 0;
+    keys.forEach(function (k) {
+      gap += Math.abs(alloc[k] - target[k]);
+    });
+    return { alloc: alloc, gap: gap };
+  }
+
+  function groupByDomain(list) {
+    var by = {};
+    list.forEach(function (q) {
+      var k = domainKey(q.domainLabel);
+      (by[k] = by[k] || []).push(q);
+    });
+    return by;
+  }
+
+  function countByDomain(by) {
+    var n = {};
+    Object.keys(by).forEach(function (k) {
+      n[k] = by[k].length;
+    });
+    return n;
+  }
+
+  function pickByAlloc(by, alloc) {
+    var picked = [];
+    Object.keys(alloc).forEach(function (k) {
+      picked = picked.concat(shuffle(by[k] || []).slice(0, alloc[k]));
+    });
+    return picked;
+  }
+
   // 配点比率に応じて、問題プールから公式の問題数まで抽出する(プールが足りないときは全問)。
   function sampleByWeights(data) {
     var pool = data.questions;
     var total = data.officialQuestionCount;
     var weights = data.domainWeights;
     if (!total || !weights || pool.length <= total) return shuffle(pool);
-    var byDomain = {};
-    pool.forEach(function (q) {
-      var k = domainKey(q.domainLabel);
-      (byDomain[k] = byDomain[k] || []).push(q);
-    });
-    var picked = [];
-    var rest = [];
-    Object.keys(byDomain).forEach(function (k) {
-      var list = shuffle(byDomain[k]);
-      var want = Math.round(((weights[k] || 0) * total) / 100);
-      picked = picked.concat(list.slice(0, want));
-      rest = rest.concat(list.slice(want));
-    });
-    rest = shuffle(rest);
-    while (picked.length < total && rest.length) picked.push(rest.shift());
-    // 丸めで超過した分は、最も多く選ばれた分野から外す(特定の分野が丸ごと消えないようにする)
-    while (picked.length > total) {
-      var counts = {};
-      picked.forEach(function (q) {
-        var k = domainKey(q.domainLabel);
-        counts[k] = (counts[k] || 0) + 1;
-      });
-      var maxKey = Object.keys(counts).sort(function (x, y) {
-        return counts[y] - counts[x];
-      })[0];
-      var idxs = [];
-      picked.forEach(function (q, i) {
-        if (domainKey(q.domainLabel) === maxKey) idxs.push(i);
-      });
-      picked.splice(idxs[Math.floor(Math.random() * idxs.length)], 1);
-    }
+    var by = groupByDomain(pool);
+    var picked = pickByAlloc(by, allocateByWeights(weights, total, countByDomain(by)).alloc);
     return shuffle(picked);
   }
 
-  // シナリオ形式の試験は、問題を持つシナリオからランダムに選び、シナリオごとにまとめて出題する。
+  // 組み合わせ(n個からk個)を列挙する。
+  function combinations(items, k) {
+    var out = [];
+    (function rec(start, cur) {
+      if (cur.length === k) {
+        out.push(cur.slice());
+        return;
+      }
+      for (var i = start; i < items.length; i++) {
+        cur.push(items[i]);
+        rec(i + 1, cur);
+        cur.pop();
+      }
+    })(0, []);
+    return out;
+  }
+
+  // 各シナリオから同数(公式: 60問 ÷ 4シナリオ = 15問)ずつ出す前提で、分野別の出題数が公式の配点比率に
+  // 最も近くなる配分を、局所探索で求める。
+  function planScenarioMix(set, byScenario, weights, total, per) {
+    var target = {};
+    var domains = Object.keys(weights);
+    domains.forEach(function (k) {
+      target[k] = (weights[k] * total) / 100;
+    });
+    var cur = {};
+    domains.forEach(function (k) {
+      cur[k] = 0;
+    });
+    var plan = {};
+    set.forEach(function (sc) {
+      var av = byScenario[sc.id];
+      var x = {};
+      var want = Math.min(per, Object.keys(av).reduce(function (n, k) { return n + av[k].length; }, 0));
+      for (var i = 0; i < want; i++) {
+        var best = null;
+        Object.keys(av).forEach(function (k) {
+          if ((x[k] || 0) < av[k].length && (best === null || target[k] - cur[k] > target[best] - cur[best])) best = k;
+        });
+        x[best] = (x[best] || 0) + 1;
+        cur[best] = (cur[best] || 0) + 1;
+      }
+      plan[sc.id] = x;
+    });
+    var improved = true;
+    while (improved) {
+      improved = false;
+      set.forEach(function (sc) {
+        var av = byScenario[sc.id];
+        var x = plan[sc.id];
+        Object.keys(x).forEach(function (d1) {
+          Object.keys(av).forEach(function (d2) {
+            if (d1 === d2 || !(x[d1] > 0) || (x[d2] || 0) >= av[d2].length) return;
+            var before = Math.abs(cur[d1] - target[d1]) + Math.abs((cur[d2] || 0) - target[d2]);
+            var after = Math.abs(cur[d1] - 1 - target[d1]) + Math.abs((cur[d2] || 0) + 1 - target[d2]);
+            if (after < before - 1e-9) {
+              x[d1]--;
+              x[d2] = (x[d2] || 0) + 1;
+              cur[d1]--;
+              cur[d2] = (cur[d2] || 0) + 1;
+              improved = true;
+            }
+          });
+        });
+      });
+    }
+    var gap = 0;
+    domains.forEach(function (k) {
+      gap += Math.abs((cur[k] || 0) - target[k]);
+    });
+    return { plan: plan, gap: gap };
+  }
+
+  // シナリオ形式の試験: 公式どおり、シナリオごとに同数ずつ、シナリオごとにまとめて出題する。
+  // シナリオの組み合わせは、分野別の出題数が公式の配点比率に最も近くなるものからランダムに選ぶ。
   function selectQuestions(data) {
     if (data.scenarios && data.scenarioCount) {
       var usable = data.scenarios.filter(function (sc) {
@@ -204,20 +320,46 @@
           return q.scenario === sc.id;
         });
       });
-      var chosen = shuffle(usable).slice(0, data.scenarioCount);
-      // 1シナリオあたりの上限(公式: 60問 ÷ 4シナリオ = 15問)。問題プールが多くても公式の問題数に収める。
-      var perScenario = data.officialQuestionCount
-        ? Math.ceil(data.officialQuestionCount / data.scenarioCount)
-        : Infinity;
-      var out = [];
-      chosen.forEach(function (sc) {
-        out = out.concat(
-          shuffle(
-            data.questions.filter(function (q) {
-              return q.scenario === sc.id;
-            })
-          ).slice(0, perScenario)
+      var count = Math.min(data.scenarioCount, usable.length);
+      var total = data.officialQuestionCount;
+      var per = total ? Math.ceil(total / data.scenarioCount) : Infinity;
+      var byScenario = {};
+      usable.forEach(function (sc) {
+        byScenario[sc.id] = groupByDomain(
+          data.questions.filter(function (q) {
+            return q.scenario === sc.id;
+          })
         );
+      });
+      var combos = combinations(usable, count).map(function (set) {
+        var r = data.domainWeights && total ? planScenarioMix(set, byScenario, data.domainWeights, per * count, per) : null;
+        return { set: set, r: r, gap: r ? r.gap : 0 };
+      });
+      var minGap = Math.min.apply(
+        null,
+        combos.map(function (c) {
+          return c.gap;
+        })
+      );
+      var best = combos.filter(function (c) {
+        return c.gap <= minGap + 1;
+      });
+      var chosen = best[Math.floor(Math.random() * best.length)];
+      var out = [];
+      shuffle(chosen.set).forEach(function (sc) {
+        var picked = [];
+        var av = byScenario[sc.id];
+        if (chosen.r) {
+          Object.keys(chosen.r.plan[sc.id]).forEach(function (k) {
+            picked = picked.concat(shuffle(av[k]).slice(0, chosen.r.plan[sc.id][k]));
+          });
+        } else {
+          Object.keys(av).forEach(function (k) {
+            picked = picked.concat(av[k]);
+          });
+          picked = shuffle(picked).slice(0, per);
+        }
+        out = out.concat(shuffle(picked));
       });
       return out;
     }

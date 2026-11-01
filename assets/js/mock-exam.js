@@ -295,6 +295,7 @@
       '<div class="me-panel" id="me-panel">'
       + '<div class="me-panel-item">残り時間: <strong class="me-timer" id="me-timer">' + formatClock(timeLimitFor(data, questions.length) * 60) + "</strong></div>"
       + '<div class="me-panel-item" id="me-progress">解答済み: <strong>0</strong> / ' + questions.length + "</div>"
+      + '<div class="me-panel-item" id="me-accuracy">正答率: <strong>-</strong></div>'
       + '<div class="me-panel-item me-flag-list" id="me-flag-list" hidden>フラグ:<span></span></div>'
       + '<div class="me-panel-spacer"></div>'
       + '<button type="button" class="me-btn" id="me-grade-btn">試験を終了して結果を見る</button>'
@@ -361,12 +362,18 @@
     root.innerHTML = panelHtml + '<div id="me-questions">' + questionsHtml + "</div>";
 
     var progressStrong = root.querySelector("#me-progress strong");
+    var accuracyStrong = root.querySelector("#me-accuracy strong");
     function updateProgress() {
-      progressStrong.textContent = String(
-        questions.filter(function (q) {
-          return q.locked;
-        }).length
-      );
+      var locked = questions.filter(function (q) {
+        return q.locked;
+      });
+      var correct = locked.filter(function (q) {
+        return q.isCorrect;
+      }).length;
+      progressStrong.textContent = String(locked.length);
+      accuracyStrong.textContent = locked.length
+        ? Math.round((correct / locked.length) * 100) + "% (" + correct + "/" + locked.length + ")"
+        : "-";
     }
     function findQuestion(el) {
       var card = el.closest(".me-question");

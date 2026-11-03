@@ -747,102 +747,7 @@
     return { correctCount: correctCount, total: questions.length, domainStats: domainStats, scenarioStats: scenarioStats, review: review, questions: questions };
   }
 
-  // レポート文字列を、画像のPDF(A4・各ページがJPEG)にする。外部ライブラリは使わない。
-  // 日本語はブラウザの描画をそのまま使うので文字化けしないが、PDF内の文字は選択・検索できない。
-  function textToPdfBlob(text) {
-    var W = 1240, H = 1754, M = 90, FONT = '"Hiragino Sans","Yu Gothic","Meiryo","Noto Sans CJK JP",sans-serif';
-    var pages = [];
-    var canvas = document.createElement("canvas");
-    canvas.width = W;
-    canvas.height = H;
-    var ctx = canvas.getContext("2d");
-    var y;
-    function newPage() {
-      if (y !== undefined) pages.push(canvas.toDataURL("image/jpeg", 0.85));
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = "#000";
-      ctx.textBaseline = "top";
-      y = M;
-    }
-    function drawLine(str, size, bold, indent) {
-      ctx.font = (bold ? "bold " : "") + size + "px " + FONT;
-      var lineH = Math.round(size * 1.55);
-      var maxW = W - M * 2 - indent;
-      var cur = "";
-      var parts = [];
-      for (var i = 0; i < str.length; i++) {
-        if (cur && ctx.measureText(cur + str[i]).width > maxW) {
-          parts.push(cur);
-          cur = str[i];
-        } else {
-          cur += str[i];
-        }
-      }
-      parts.push(cur);
-      parts.forEach(function (p) {
-        if (y + lineH > H - M) newPage();
-        ctx.font = (bold ? "bold " : "") + size + "px " + FONT;
-        ctx.fillText(p, M + indent, y);
-        y += lineH;
-      });
-    }
-    newPage();
-    text.split("\n").forEach(function (raw) {
-      var line = raw;
-      if (/^\|[-| ]+\|$/.test(line)) return;
-      if (/^# /.test(line)) { y += 6; drawLine(line.slice(2), 40, true, 0); y += 10; return; }
-      if (/^## /.test(line)) { y += 22; drawLine(line.slice(3), 32, true, 0); y += 6; return; }
-      if (/^### /.test(line)) { y += 22; drawLine(line.slice(4), 28, true, 0); return; }
-      if (/^\|/.test(line)) {
-        line = line.replace(/^\||\|$/g, "").split("|").map(function (c) { return c.trim(); }).join("  /  ");
-      }
-      if (line === "") { y += 14; return; }
-      drawLine(line, 26, false, /^- /.test(line) ? 20 : 0);
-    });
-    pages.push(canvas.toDataURL("image/jpeg", 0.85));
-
-    var enc = new TextEncoder();
-    var chunks = [];
-    var offsets = [];
-    var pos = 0;
-    function put(x) {
-      var b = typeof x === "string" ? enc.encode(x) : x;
-      chunks.push(b);
-      pos += b.length;
-    }
-    function obj(n, body) {
-      offsets[n] = pos;
-      put(n + " 0 obj\n");
-      put(body);
-      put("\nendobj\n");
-    }
-    var kids = pages.map(function (_, i) { return (3 + i * 3) + " 0 R"; }).join(" ");
-    put("%PDF-1.4\n");
-    obj(1, "<< /Type /Catalog /Pages 2 0 R >>");
-    obj(2, "<< /Type /Pages /Kids [" + kids + "] /Count " + pages.length + " >>");
-    pages.forEach(function (url, i) {
-      var bin = atob(url.split(",")[1]);
-      var bytes = new Uint8Array(bin.length);
-      for (var k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
-      var pageN = 3 + i * 3, contentN = pageN + 1, imgN = pageN + 2;
-      var content = "q 595.28 0 0 841.89 0 0 cm /Im0 Do Q";
-      obj(pageN, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /XObject << /Im0 " + imgN + " 0 R >> >> /Contents " + contentN + " 0 R >>");
-      obj(contentN, "<< /Length " + content.length + " >>\nstream\n" + content + "\nendstream");
-      offsets[imgN] = pos;
-      put(imgN + " 0 obj\n<< /Type /XObject /Subtype /Image /Width " + W + " /Height " + H + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + bytes.length + " >>\nstream\n");
-      put(bytes);
-      put("\nendstream\nendobj\n");
-    });
-    var count = 3 + pages.length * 3;
-    var xref = pos;
-    var xr = "xref\n0 " + count + "\n0000000000 65535 f \n";
-    for (var n = 1; n < count; n++) xr += ("0000000000" + offsets[n]).slice(-10) + " 00000 n \n";
-    put(xr + "trailer\n<< /Size " + count + " /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n");
-    return new Blob(chunks, { type: "application/pdf" });
-  }
-
-  // 結果レポート(Markdown)。summary=メール本文(短い要約)、full=添付するPDFの元テキスト(不正解・未解答の問題の問題文・選択肢・回答・正解まで)。
+  // 結果レポート(Markdown)。summary=メール本文(短い要約)、full=添付するテキストファイル(不正解・未解答の問題の問題文・選択肢・回答・正解まで)。
   // 問題ID(q.id)は出題データ固有の番号で、出題順や選択肢をシャッフルしても変わらない。
   function buildReport(data, result, scaled, pass) {
     var d = new Date();
@@ -893,10 +798,10 @@
     });
     lines.push("");
     var subject = "[模擬試験結果] " + data.examTitle + " " + dateStr + " " + pct + "%";
-    return { subject: subject, summary: summary, full: lines.join("\n"), fileName: "模擬試験結果_" + dateStr + ".pdf" };
+    return { subject: subject, summary: summary, full: lines.join("\n"), fileName: "模擬試験結果_" + dateStr + ".txt" };
   }
 
-  // 結果をメールで送る(外部サービスなし)。Web Share APIで、要約を本文、詳細のPDFを添付として共有する。
+  // 結果をメールで送る(外部サービスなし)。Web Share APIで、要約を本文、詳細のテキストファイルを添付として共有する。
   function renderMailBox(panel, report) {
     var box = document.createElement("div");
     box.className = "me-mail";
@@ -905,11 +810,11 @@
       + '<div class="me-mail-actions">'
       + '<button type="button" class="me-btn" id="me-share-btn">メールアプリに添付して共有</button>'
       + "</div>"
-      + '<p class="me-note" id="me-mail-status">本文には要約(スコア・分野別正答率・見直す問題のID)を入れ、詳細はPDFファイルで添付します。共有に対応した環境(スマートフォンなど)で使えます。宛先は共有先のアプリで選びます。</p>';
+      + '<p class="me-note" id="me-mail-status">本文には要約(スコア・分野別正答率・見直す問題のID)を入れ、詳細はテキストファイル(.txt)で添付します。共有に対応した環境(スマートフォンなど)で使えます。宛先は共有先のアプリで選びます。</p>';
     panel.insertAdjacentElement("afterend", box);
     var status = box.querySelector("#me-mail-status");
     box.querySelector("#me-share-btn").addEventListener("click", function () {
-      var file = new File([textToPdfBlob(report.full)], report.fileName, { type: "application/pdf" });
+      var file = new File([report.full], report.fileName, { type: "text/plain;charset=utf-8" });
       if (!(navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share)) {
         status.textContent = "この環境は、ファイルの共有に対応していません。";
         return;

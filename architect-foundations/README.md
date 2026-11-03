@@ -15,7 +15,7 @@ Anthropic公式の技術認定「Claude Certified Architect – Foundations」�
 
 この試験の `topics/` のノートを、ドメイン順に続けて音声で再生します(音声ファイル。画面ロック中も続きます。コード・図・出典は読み飛ばします)。
 
-{% assign ra_notes = site.pages | where_exp: "p", "p.path contains 'claude/architect-foundations/topics/'" | where: "name", "notes.md" | sort: "path" %}
+{% assign ra_notes = site.pages | where_exp: "p", "p.path contains 'architect-foundations/topics/'" | where: "name", "notes.md" | sort: "path" %}
 <div id="read-aloud-all" data-urls="{% for p in ra_notes %}{{ p.url | relative_url }},{% endfor %}" data-titles="{% for p in ra_notes %}{{ p.title }}|{% endfor %}"></div>
 
 ## フォルダ構成

@@ -770,6 +770,11 @@
       var low = s.total && s.correct / s.total < passRate;
       lines.push("- " + label + ": " + s.correct + "/" + s.total + " (" + (s.total ? Math.round((s.correct / s.total) * 100) + "%" : "-") + ")"
         + (w != null ? " ・配点" + w + "%" : "") + (low ? " ★要復習" : ""));
+      if (s.link && low) {
+        var url = s.link;
+        try { url = new URL(s.link, location.href).href; } catch (e) {}
+        lines.push("  学習ノート: " + url);
+      }
     });
     var wrong = result.questions.filter(function (q) { return q.answered && !q.isCorrect; });
     var skipped = result.questions.filter(function (q) { return !q.answered; });
@@ -789,12 +794,14 @@
       lines.push("");
       lines.push("### 問題ID " + q.id + " [" + q.domainLabel + "] " + (q.answered ? "不正解" : "未解答"));
       lines.push(plain(q.stemJa));
+      lines.push("");
       q.options.forEach(function (o, i) {
         var picked = !!q.picked && q.picked.indexOf(o.origLetter) !== -1;
         var correct = q.correct.indexOf(o.origLetter) !== -1;
         var mark = picked ? (correct ? "●" : "×") : correct ? "○" : "　";
         lines.push(mark + " " + String.fromCharCode(65 + i) + ". " + plain(o.ja));
       });
+      lines.push("");
       lines.push("- 解説: " + plain(q.explanation));
       if (q.runnerUp) lines.push("- 次点(" + displayLetterOf(q, q.runnerUp.letter) + "): " + plain(q.runnerUp.why));
       if (q.others) {

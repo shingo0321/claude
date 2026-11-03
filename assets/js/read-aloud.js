@@ -18,6 +18,7 @@
   var state = "stopped"; // stopped | playing | paused
   var token = 0;
   var rate = saved.rate || 1;
+  var pitch = saved.pitch || 1;
   var lastUtter = null;
 
   function clean(t) {
@@ -50,11 +51,13 @@
     var voices = synth.getVoices().filter(function (v) { return /^ja/i.test(v.lang); });
     if (!voices.length) return null;
     var byName = voices.filter(function (v) { return v.name === saved.voice; })[0];
-    var pref = voices.filter(function (v) { return /Nanami|Google|Kyoko|Haruka|Natural/i.test(v.name); });
-    return byName || pref[0] || voices[0];
+    // 自動選択: 高品質(Natural/Neural/Siri/拡張)→ 代表的な声 → 先頭の順
+    var hq = voices.filter(function (v) { return /Natural|Neural|Siri|Enhanced|Premium|拡張|Nanami/i.test(v.name); });
+    var pref = voices.filter(function (v) { return /Google|Kyoko|Haruka|Otoya/i.test(v.name); });
+    return byName || hq[0] || pref[0] || voices[0];
   }
 
-  var bar, btnPlay, selRate, selJump, info, curEl;
+  var bar, btnPlay, selRate, selPitch, selVoice, selJump, info, curEl;
 
   function highlight(el) {
     if (curEl) curEl.style.background = "";
@@ -101,6 +104,7 @@
       var v = useVoice ? pickVoice() : null;
       if (v) u.voice = v;
       u.rate = rate;
+      u.pitch = pitch;
       var started = false;
       u.onstart = function () { started = true; };
       u.onend = function () { if (my === token && state === "playing") { idx++; speakNext(my); } };
@@ -189,6 +193,45 @@
       if (state !== "stopped") playFrom(idx);
     };
 
+    function save() { try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch (e) {} }
+
+    selPitch = document.createElement("select");
+    [[0.8, "低め"], [1, "標準"], [1.2, "高め"], [1.4, "かなり高め"]].forEach(function (p) {
+      var o = document.createElement("option");
+      o.value = p[0]; o.textContent = "声の高さ " + p[1];
+      if (p[0] === pitch) o.selected = true;
+      selPitch.appendChild(o);
+    });
+    selPitch.onchange = function () {
+      pitch = parseFloat(selPitch.value);
+      saved.pitch = pitch; save();
+      if (state === "playing") playFrom(idx);
+    };
+
+    selVoice = document.createElement("select");
+    selVoice.style.maxWidth = "14rem";
+    function fillVoices() {
+      var list = synth.getVoices().filter(function (v) { return /^ja/i.test(v.lang); });
+      selVoice.textContent = "";
+      var auto = document.createElement("option");
+      auto.value = ""; auto.textContent = list.length ? "声: 自動" : "声: (日本語の声なし)";
+      selVoice.appendChild(auto);
+      list.forEach(function (v) {
+        var o = document.createElement("option");
+        o.value = v.name;
+        o.textContent = v.name.replace(/ - Japanese.*$/, "").replace(/^Microsoft /, "");
+        if (saved.voice === v.name) o.selected = true;
+        selVoice.appendChild(o);
+      });
+      if (!saved.voice) selVoice.value = "";
+    }
+    selVoice.onchange = function () {
+      saved.voice = selVoice.value; save();
+      if (state === "playing") playFrom(idx);
+    };
+    fillVoices();
+    if (synth.addEventListener) synth.addEventListener("voiceschanged", fillVoices);
+
     selJump = document.createElement("select");
     var o0 = document.createElement("option");
     o0.textContent = allBox ? "ノート・見出しへ移動…" : "見出しへ移動…";
@@ -211,7 +254,7 @@
     info = document.createElement("span");
     info.style.color = "#555";
 
-    [btnPlay, btnPrev, btnNext, btnStop, selRate, selJump, info].forEach(function (n) { bar.appendChild(n); });
+    [btnPlay, btnPrev, btnNext, btnStop, selRate, selPitch, selVoice, selJump, info].forEach(function (n) { bar.appendChild(n); });
     if (host) host.appendChild(bar); else after.parentNode.insertBefore(bar, after.nextSibling);
 
     window.addEventListener("beforeunload", function () { synth.cancel(); });

@@ -66,8 +66,22 @@
     }
   }
 
+  // プルダウンを「今読んでいる見出し」に合わせる(停止中は先頭の案内文)
+  function syncJump() {
+    if (!selJump) return;
+    var cur = "";
+    if (state !== "stopped") {
+      for (var k = 0; k < selJump.options.length; k++) {
+        var v = selJump.options[k].value;
+        if (v !== "" && parseInt(v, 10) <= idx) cur = v;
+      }
+    }
+    selJump.value = cur;
+  }
+
   function setUI() {
     btnPlay.textContent = state === "playing" ? "⏸ 一時停止" : (state === "paused" ? "▶ 再開" : (allBox ? "▶ 全ノートを読み上げ" : "▶ 読み上げ"));
+    syncJump();
     if (state === "stopped") { info.textContent = ""; return; }
     var it = items[idx];
     info.textContent = (it && it.note ? it.note + " ｜ " : "") + (idx + 1) + " / " + items.length;
@@ -191,7 +205,6 @@
     });
     selJump.onchange = function () {
       if (selJump.value !== "") playFrom(parseInt(selJump.value, 10));
-      selJump.value = "";
     };
     selJump.style.maxWidth = "16rem";
 

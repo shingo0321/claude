@@ -7,6 +7,9 @@
   var allBox = document.getElementById("read-aloud-all");
   var single = /\/topics\//.test(location.pathname);
   if (!allBox && !single) return;
+  // ブラウザ内蔵の音声合成による読み上げバー。通常は非表示(音声ファイルのプレイヤーだけ出す)。
+  // 復活させたいときは true にする。
+  var SHOW_TTS = false;
 
   var synth = window.speechSynthesis;
   var STORE = "claude-study-readaloud";
@@ -392,7 +395,28 @@
     return wrap;
   }
 
+  function initAudioOnly() {
+    if (allBox) {
+      var urls0 = (allBox.getAttribute("data-urls") || "").split(",").filter(Boolean);
+      var titles0 = (allBox.getAttribute("data-titles") || "").split("|");
+      Promise.all(urls0.map(function (u) { return exists(audioUrl(u)); })).then(function (oks) {
+        var tracks = [];
+        urls0.forEach(function (u, n) { if (oks[n]) tracks.push({ title: titles0[n] || ("ノート" + (n + 1)), src: audioUrl(u) }); });
+        if (tracks.length) allBox.appendChild(audioPlayer(tracks, true));
+      });
+    } else {
+      var h = document.querySelector(".main-content h1");
+      var a = audioUrl(location.pathname);
+      if (h && a !== location.pathname) {
+        exists(a).then(function (ok) {
+          if (ok) h.parentNode.insertBefore(audioPlayer([{ title: h.textContent.trim(), src: a }], false), h.nextSibling);
+        });
+      }
+    }
+  }
+
   function init() {
+    if (!SHOW_TTS) { initAudioOnly(); return; }
     if (allBox) {
       var urls = (allBox.getAttribute("data-urls") || "").split(",").filter(Boolean);
       var titles = (allBox.getAttribute("data-titles") || "").split("|");

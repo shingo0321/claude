@@ -1,7 +1,7 @@
 """学習ノート(topics/*/notes.md)から音声ファイル(MP3)を生成する。
 
 使い方(study/ で実行):
-    pip install edge-tts
+    pip install edge-tts imageio-ffmpeg
     python tools/make-audio.py                  # 変更のあったノートだけ生成
     python tools/make-audio.py --force          # すべて作り直す
     python tools/make-audio.py associate-foundations   # 試験を絞る
@@ -13,15 +13,18 @@ import asyncio
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 import edge_tts
+import imageio_ffmpeg
 
 ROOT = Path(__file__).resolve().parent.parent
 EXAMS = ["associate-foundations", "developer-foundations", "architect-foundations", "architect-professional"]
 VOICE = "ja-JP-NanamiNeural"
 RATE = "+0%"
+BITRATE = "24k"      # 通信量節約のため(元の合成結果は48kbps)。音声は聞き取りに十分
 CHUNK = 900          # 1回の合成に渡す最大文字数
 CONCURRENCY = 4
 VERSION = "2"        # 抽出・読み辞書のロジックを変えたら上げる(全再生成のため)
@@ -124,13 +127,22 @@ async def synth_one(sem, text):
         raise RuntimeError("音声合成に失敗しました")
 
 
+def transcode(src, dst):
+    """モノラル24kHz・低ビットレートのMP3へ変換する(通信量の節約)。"""
+    subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-i", str(src),
+                    "-ac", "1", "-ar", "24000", "-c:a", "libmp3lame", "-b:a", BITRATE, str(dst)], check=True)
+
+
 async def build(notes_path, out_path):
     lines = extract(notes_path.read_text(encoding="utf-8"))
     parts = chunks(lines)
     sem = asyncio.Semaphore(CONCURRENCY)
     datas = await asyncio.gather(*[synth_one(sem, p) for p in parts])
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_bytes(b"".join(datas))
+    raw = out_path.with_suffix(".raw.mp3")
+    raw.write_bytes(b"".join(datas))
+    transcode(raw, out_path)
+    raw.unlink()
     return len(parts), len("".join(parts))
 
 

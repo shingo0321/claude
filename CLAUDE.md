@@ -15,6 +15,6 @@ Claude認定プログラムの学習ノート、gitリポジトリ(`shingo0321/c
 
 - `<試験>/mock-exam/mock-exam-data.js` — 模擬試験の問題データ(エンジンは`assets/js/mock-exam.js`)。各問は`explanation`(正答の理由)に加え、`runnerUp`(次点: `{letter, why}`)・`others`(ほかの誤答の理由: 文字→理由)・任意の`deep`(見分け方)・`fig`(図: `steps`/`end`/`back`のフロー、または`kind:"table"`の表)を持つ。文字はデータ中の元の文字で、エンジンが選択肢のシャッフル後の表示文字に変換するので、`explanation`の本文に「Bは…」のように選択肢の文字を書かないこと。問題を足したり正答を変えたら、`practice-questions/README.md`(同じ内容を`次点`・`ほかの選択肢`込みで掲載)と、各試験の`overview.md`も合わせて更新する。
 
-- 模擬試験の結果メール — 結果画面で、本文=要約(スコア・分野別正答率・不正解/未解答の問題ID)、添付=詳細の.md(問題文・選択肢・自分の回答・正解)のメールを作る(`assets/js/mock-exam.js`の`buildReport`・`renderMailBox`)。mailtoはファイルを添付できないため、スマートフォン等は「共有」(Web Share API)、パソコンは「.mdを保存してmailtoを開く」。外部サービスは使わない。問題IDは`mock-exam-data.js`の`id`で、シャッフルしても変わらない。サイト上にはメールの用途(Claudeなど)を書かない。宛先はユーザーが入力し、そのブラウザのlocalStorageにだけ保存する。
+- 模擬試験の結果メール — 結果画面の「メールアプリに添付して共有」(Web Share API)が、本文=要約(スコア・分野別正答率・不正解/未解答の問題ID)、添付=詳細の.md(問題文・選択肢・自分の回答・正解)を共有する(`assets/js/mock-exam.js`の`buildReport`・`renderMailBox`)。mailtoはファイルを添付できず本文も短いため使わない。共有非対応の環境(多くのパソコン)ではボタンを押すと非対応と表示される。外部サービスは使わない。問題IDは`mock-exam-data.js`の`id`で、シャッフルしても変わらない。サイト上にはメールの用途(Claudeなど)を書かない。
 - これは親ワークスペース`c:\Users\snows\Claude\`(それ自体はgitリポジトリではない)・`study/ipa/`・`study/english/`とは別のgitリポジトリである。
 - 内容は日本語で書かれている。

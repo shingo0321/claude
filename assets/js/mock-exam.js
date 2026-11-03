@@ -800,60 +800,27 @@
     return { subject: subject, summary: summary, full: lines.join("\n"), fileName: "模擬試験結果_" + dateStr + ".md" };
   }
 
-  // 結果をメールで送る(外部サービスなし)。本文は要約、詳細は.mdファイルを添付する。
-  // 宛先は、ユーザーが入力した値をこのブラウザのlocalStorageにだけ保存する(サイトには載せない)。
+  // 結果をメールで送る(外部サービスなし)。Web Share APIで、要約を本文、詳細の.mdを添付として共有する。
   function renderMailBox(panel, report) {
-    var KEY = "mockExamMailTo";
-    var saved = "";
-    try { saved = localStorage.getItem(KEY) || ""; } catch (e) {}
     var box = document.createElement("div");
     box.className = "me-mail";
     box.innerHTML =
       '<strong>結果をメールで送る</strong>'
       + '<div class="me-mail-actions">'
-      + '<input type="email" id="me-mail-to" placeholder="送信先のメールアドレス" value="' + escapeHtml(saved) + '" style="flex:1;min-width:12rem;padding:0.4rem;border:1px solid #d0d7de;border-radius:6px;">'
-      + "</div>"
-      + '<div class="me-mail-actions">'
       + '<button type="button" class="me-btn" id="me-share-btn">メールアプリに添付して共有</button>'
-      + '<button type="button" class="me-btn me-btn-secondary" id="me-mailto-btn">ファイルを保存してメールを作成</button>'
       + "</div>"
-      + '<p class="me-note" id="me-mail-status">本文には要約(スコア・分野別正答率・見直す問題のID)を入れ、詳細は.mdファイルで添付します。「共有」はスマートフォンなど、共有に対応した環境向けです(宛先は共有先のアプリで選びます)。「保存して作成」はパソコン向けで、保存された.mdファイルをメールに添付してください。入力したアドレスはこのブラウザにだけ保存されます。</p>';
+      + '<p class="me-note" id="me-mail-status">本文には要約(スコア・分野別正答率・見直す問題のID)を入れ、詳細は.mdファイルで添付します。共有に対応した環境(スマートフォンなど)で使えます。宛先は共有先のアプリで選びます。</p>';
     panel.insertAdjacentElement("afterend", box);
     var status = box.querySelector("#me-mail-status");
-    function makeFile() {
-      return new File([report.full], report.fileName, { type: "text/markdown" });
-    }
-    function saveAddress() {
-      var to = box.querySelector("#me-mail-to").value.trim();
-      try { localStorage.setItem(KEY, to); } catch (e) {}
-      return to;
-    }
     box.querySelector("#me-share-btn").addEventListener("click", function () {
-      saveAddress();
-      var file = makeFile();
+      var file = new File([report.full], report.fileName, { type: "text/markdown" });
       if (!(navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share)) {
-        status.textContent = "この環境は、ファイルの共有に対応していません。「ファイルを保存してメールを作成」を使ってください。";
+        status.textContent = "この環境は、ファイルの共有に対応していません。";
         return;
       }
       navigator.share({ files: [file], title: report.subject, text: report.summary }).catch(function (e) {
-        if (e && e.name !== "AbortError") status.textContent = "共有に失敗しました。「ファイルを保存してメールを作成」を使ってください。";
+        if (e && e.name !== "AbortError") status.textContent = "共有に失敗しました。";
       });
-    });
-    box.querySelector("#me-mailto-btn").addEventListener("click", function () {
-      var to = saveAddress();
-      var blob = new Blob([report.full], { type: "text/markdown;charset=utf-8" });
-      var a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = report.fileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-      status.textContent = "「" + report.fileName + "」を保存しました。開いたメールに添付してください。";
-      var body = report.summary + "\n\n(詳細は添付の " + report.fileName + " を参照)";
-      setTimeout(function () {
-        location.href = "mailto:" + encodeURIComponent(to) + "?subject=" + encodeURIComponent(report.subject) + "&body=" + encodeURIComponent(body);
-      }, 300);
     });
   }
 

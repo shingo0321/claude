@@ -11,11 +11,11 @@ search_enabled: true
 heading_anchors: true
 
 url: "https://shingo0321.github.io"
-baseurl: "/study"
+baseurl: "/claude-study"
 
 aux_links:
   "GitHub Repository":
-    - "https://github.com/shingo0321/study"
+    - "https://github.com/shingo0321/claude-study"
 
 exclude:
   - CLAUDE.md

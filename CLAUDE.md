@@ -4,7 +4,7 @@
 
 ## これは何か
 
-Claude認定プログラムの学習ノート、gitリポジトリ(`shingo0321/study`)。現時点では`claude/`のみ存在する。IPA高度試験の学習サイトは別リポジトリ(`../ipa/`、`shingo0321/ipa`)に分離した。パスワードゲート(`_includes/head_custom.html`)は同じパスワード・保存キーを使うので、変えるときは両方を合わせること。
+Claude認定プログラムの学習ノート、gitリポジトリ(`shingo0321/claude-study`、公開URLは`/claude-study/`)。`study/`配下の3リポジトリ(`study/claude/`=このリポジトリ、`study/ipa/`=`shingo0321/ipa`、`study/english/`=`shingo0321/english-study`)の1つで、`study/`自体はgitリポジトリではない。このリポジトリのルートはフォルダ`study/claude/`で、その中にさらにコンテンツ用フォルダ`claude/`がある(公開URLとリンクを変えないため)。パスワードゲート(`_includes/head_custom.html`)は`ipa`・`english`と同じパスワード・保存キーを使うので、変えるときは3つを合わせること。
 
 - `claude/` — Anthropic公式のClaude認定プログラム(4試験、すべてPearson VUE経由)。試験ごとに1フォルダ: `associate-foundations/`、`developer-foundations/`、`architect-foundations/`、`architect-professional/`。試験一覧は`claude/README.md`を、各試験のドメイン内訳はそれぞれの試験フォルダの`README.md`を参照。各試験フォルダは同じ構成に従う: `topics/<NN-domain-name>/notes.md`(公式試験ドメインごとに1ファイル) + `practice-questions/README.md`(独自の練習問題、実際の試験内容ではない)。
 
@@ -15,5 +15,5 @@ Claude認定プログラムの学習ノート、gitリポジトリ(`shingo0321/s
 
 - `claude/<試験>/mock-exam/mock-exam-data.js` — 模擬試験の問題データ(エンジンは`assets/js/mock-exam.js`)。各問は`explanation`(正答の理由)に加え、`runnerUp`(次点: `{letter, why}`)・`others`(ほかの誤答の理由: 文字→理由)・任意の`deep`(見分け方)・`fig`(図: `steps`/`end`/`back`のフロー、または`kind:"table"`の表)を持つ。文字はデータ中の元の文字で、エンジンが選択肢のシャッフル後の表示文字に変換するので、`explanation`の本文に「Bは…」のように選択肢の文字を書かないこと。問題を足したり正答を変えたら、`practice-questions/README.md`(同じ内容を`次点`・`ほかの選択肢`込みで掲載)と、各試験の`overview.md`も合わせて更新する。
 
-- これは親ワークスペース`c:\Users\snows\Claude\`(それ自体はgitリポジトリではない)とは別のgitリポジトリである。
+- これは親ワークスペース`c:\Users\snows\Claude\`(それ自体はgitリポジトリではない)・`study/ipa/`・`study/english/`とは別のgitリポジトリである。
 - 内容は日本語で書かれている。

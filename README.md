@@ -1,6 +1,6 @@
 ---
 layout: default
-title: ホーム
+title: Claude認定 ホーム
 nav_order: 1
 description: "Claude Certification Program 学習ノート・練習問題"
 permalink: /

@@ -747,7 +747,8 @@
     return { correctCount: correctCount, total: questions.length, domainStats: domainStats, scenarioStats: scenarioStats, review: review, questions: questions };
   }
 
-  // Claudeに読み込ませる結果レポート(Markdown)。不正解・未解答の問題は、問題文・選択肢・自分の回答・正解まで含める。
+  // 結果レポート(Markdown)。summary=メール本文(短い要約)、full=添付する.md(不正解・未解答の問題の問題文・選択肢・回答・正解まで)。
+  // 問題ID(q.id)は出題データ固有の番号で、出題順や選択肢をシャッフルしても変わらない。
   function buildReport(data, result, scaled, pass) {
     var d = new Date();
     var pad = function (n) { return n < 10 ? "0" + n : String(n); };
@@ -769,15 +770,24 @@
       var w = data.domainWeights ? data.domainWeights[domainKey(label)] : null;
       lines.push("| " + label + " | " + s.correct + "/" + s.total + " | " + (s.total ? Math.round((s.correct / s.total) * 100) + "%" : "-") + " | " + (w != null ? w + "%" : "-") + " |");
     });
-    var missed = result.questions.filter(function (q) { return !q.isCorrect; });
+    var wrong = result.questions.filter(function (q) { return q.answered && !q.isCorrect; });
+    var skipped = result.questions.filter(function (q) { return !q.answered; });
+    var ids = function (arr) { return arr.map(function (q) { return q.id; }).join(", ") || "なし"; };
     lines.push("");
-    lines.push("## 不正解・未解答の問題 (" + missed.length + "問)");
-    missed.forEach(function (q) {
+    lines.push("## 見直す問題(問題ID)");
+    lines.push("");
+    lines.push("- 不正解 (" + wrong.length + "問): " + ids(wrong));
+    lines.push("- 未解答 (" + skipped.length + "問): " + ids(skipped));
+    var summary = lines.join("\n");
+
+    lines.push("");
+    lines.push("## 不正解・未解答の問題の詳細");
+    wrong.concat(skipped).forEach(function (q) {
       var letters = function (arr) {
         return arr.map(function (l) { return displayLetterOf(q, l); }).sort().join(", ");
       };
       lines.push("");
-      lines.push("### " + q.id + " [" + q.domainLabel + "] " + (q.answered ? "不正解" : "未解答"));
+      lines.push("### 問題ID " + q.id + " [" + q.domainLabel + "] " + (q.answered ? "不正解" : "未解答"));
       lines.push(plain(q.stemJa));
       q.options.forEach(function (o, i) {
         lines.push("- " + String.fromCharCode(65 + i) + ". " + plain(o.ja));
@@ -786,12 +796,11 @@
       lines.push("- 正解: " + letters(q.correct));
     });
     lines.push("");
-    lines.push("---");
-    lines.push("上の模擬試験結果を分析して、弱点の傾向と、復習すべき学習ノート・次の学習計画を教えてください。");
-    return { subject: "[模擬試験結果] " + data.examTitle + " " + dateStr + " " + pct + "%", body: lines.join("\n") };
+    var subject = "[模擬試験結果] " + data.examTitle + " " + dateStr + " " + pct + "%";
+    return { subject: subject, summary: summary, full: lines.join("\n"), fileName: "模擬試験結果_" + dateStr + ".md" };
   }
 
-  // 結果の受け渡し(外部サービスなし): コピー / .mdダウンロード / メールアプリ起動(mailto)。
+  // 結果をメールで送る(外部サービスなし)。本文は要約、詳細は.mdファイルを添付する。
   // 宛先は、ユーザーが入力した値をこのブラウザのlocalStorageにだけ保存する(サイトには載せない)。
   function renderMailBox(panel, report) {
     var KEY = "mockExamMailTo";
@@ -800,43 +809,51 @@
     var box = document.createElement("div");
     box.className = "me-mail";
     box.innerHTML =
-      '<strong>結果をClaudeで分析する</strong>'
+      '<strong>結果をメールで送る</strong>'
       + '<div class="me-mail-actions">'
-      + '<button type="button" class="me-btn" id="me-copy-btn">Claude用にコピー</button>'
-      + '<button type="button" class="me-btn me-btn-secondary" id="me-dl-btn">.mdでダウンロード</button>'
+      + '<input type="email" id="me-mail-to" placeholder="送信先のメールアドレス" value="' + escapeHtml(saved) + '" style="flex:1;min-width:12rem;padding:0.4rem;border:1px solid #d0d7de;border-radius:6px;">'
       + "</div>"
       + '<div class="me-mail-actions">'
-      + '<input type="email" id="me-mail-to" placeholder="自分のメールアドレス" value="' + escapeHtml(saved) + '" style="flex:1;min-width:12rem;padding:0.4rem;border:1px solid #d0d7de;border-radius:6px;">'
-      + '<button type="button" class="me-btn me-btn-secondary" id="me-mailto-btn">メールアプリで作成</button>'
+      + '<button type="button" class="me-btn" id="me-share-btn">メールアプリに添付して共有</button>'
+      + '<button type="button" class="me-btn me-btn-secondary" id="me-mailto-btn">ファイルを保存してメールを作成</button>'
       + "</div>"
-      + '<p class="me-note" id="me-mail-status">コピーしてClaudeに貼り付けるか、メールで自分宛てに送っておき、Claudeに「模擬試験結果メールを読んで分析して」と頼めます。メールアプリで作成する方法は、本文が長いと途中で切れるため、全文は「コピー」か「ダウンロード」を使ってください。</p>';
+      + '<p class="me-note" id="me-mail-status">本文には要約(スコア・分野別正答率・見直す問題のID)を入れ、詳細は.mdファイルで添付します。「共有」はスマートフォンなど、共有に対応した環境向けです(宛先は共有先のアプリで選びます)。「保存して作成」はパソコン向けで、保存された.mdファイルをメールに添付してください。入力したアドレスはこのブラウザにだけ保存されます。</p>';
     panel.insertAdjacentElement("afterend", box);
     var status = box.querySelector("#me-mail-status");
-    box.querySelector("#me-copy-btn").addEventListener("click", function () {
-      var done = function () { status.textContent = "コピーしました。Claudeに貼り付けてください。"; };
-      var fail = function () { status.textContent = "コピーに失敗しました。ダウンロードを使ってください。"; };
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(report.body).then(done, fail);
-      else fail();
+    function makeFile() {
+      return new File([report.full], report.fileName, { type: "text/markdown" });
+    }
+    function saveAddress() {
+      var to = box.querySelector("#me-mail-to").value.trim();
+      try { localStorage.setItem(KEY, to); } catch (e) {}
+      return to;
+    }
+    box.querySelector("#me-share-btn").addEventListener("click", function () {
+      saveAddress();
+      var file = makeFile();
+      if (!(navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share)) {
+        status.textContent = "この環境は、ファイルの共有に対応していません。「ファイルを保存してメールを作成」を使ってください。";
+        return;
+      }
+      navigator.share({ files: [file], title: report.subject, text: report.summary }).catch(function (e) {
+        if (e && e.name !== "AbortError") status.textContent = "共有に失敗しました。「ファイルを保存してメールを作成」を使ってください。";
+      });
     });
-    box.querySelector("#me-dl-btn").addEventListener("click", function () {
-      var blob = new Blob([report.body], { type: "text/markdown;charset=utf-8" });
+    box.querySelector("#me-mailto-btn").addEventListener("click", function () {
+      var to = saveAddress();
+      var blob = new Blob([report.full], { type: "text/markdown;charset=utf-8" });
       var a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = report.subject.replace(/[\/:*?"<>|\s]+/g, "_") + ".md";
+      a.download = report.fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-      status.textContent = "ダウンロードしました。Claudeに添付するか、メールに添付して送ってください。";
-    });
-    box.querySelector("#me-mailto-btn").addEventListener("click", function () {
-      var to = box.querySelector("#me-mail-to").value.trim();
-      try { localStorage.setItem(KEY, to); } catch (e) {}
-      var MAX = 1500;
-      var body = report.body.length > MAX
-        ? report.body.slice(0, MAX) + "\n\n(長いため途中までです。全文は「コピー」または「ダウンロード」を使ってください)"
-        : report.body;
-      location.href = "mailto:" + encodeURIComponent(to) + "?subject=" + encodeURIComponent(report.subject) + "&body=" + encodeURIComponent(body);
+      status.textContent = "「" + report.fileName + "」を保存しました。開いたメールに添付してください。";
+      var body = report.summary + "\n\n(詳細は添付の " + report.fileName + " を参照)";
+      setTimeout(function () {
+        location.href = "mailto:" + encodeURIComponent(to) + "?subject=" + encodeURIComponent(report.subject) + "&body=" + encodeURIComponent(body);
+      }, 300);
     });
   }
 

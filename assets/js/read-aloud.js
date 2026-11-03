@@ -20,6 +20,22 @@
   var rate = saved.rate || 1;
   var pitch = saved.pitch || 1;
   var lastUtter = null;
+  var wakeLock = null;
+
+  // 再生中は画面が消えないようにする(消えるとスマホでは読み上げが止まるため)。未対応の端末では何もしない。
+  function lockScreen() {
+    if (!navigator.wakeLock || wakeLock) return;
+    navigator.wakeLock.request("screen").then(function (l) {
+      wakeLock = l;
+      l.addEventListener("release", function () { wakeLock = null; });
+    }).catch(function () {});
+  }
+  function unlockScreen() {
+    if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && state === "playing") lockScreen();
+  });
 
   function clean(t) {
     return t.replace(/`/g, "").replace(/https?:\/\/\S+/g, "リンク").replace(/\s+/g, " ").trim();
@@ -65,6 +81,7 @@
         if (el.tagName === "P" && el.closest("li,td,th")) return;
         text = clean(el.textContent);
       }
+      if (/^(出典|注記)\s*[::]/.test(text)) return; // 出典・注記は読み上げない
       var isH = el.tagName.charAt(0) === "H";
       if (isH) text = text.replace(/^\d+\.\s*/, "") + "。";
       if (text) out.push({ el: live ? el : null, text: text, note: note, tag: el.tagName, head: isH ? text.replace(/。$/, "") : "" });
@@ -153,6 +170,7 @@
     if (synth.speaking || synth.pending) synth.cancel();
     idx = Math.max(0, Math.min(i, items.length - 1));
     state = "playing";
+    lockScreen();
     setUI();
     // Safariはユーザー操作の中で直接speak()しないと無音になるため、遅延させず同期で呼ぶ
     speakNext(token);
@@ -162,6 +180,7 @@
     token++;
     synth.cancel();
     state = "stopped";
+    unlockScreen();
     idx = 0;
     highlight(null);
     setUI();
@@ -177,9 +196,9 @@
       }
       playFrom(start);
     } else if (state === "playing") {
-      synth.pause(); state = "paused"; setUI();
+      synth.pause(); state = "paused"; unlockScreen(); setUI();
     } else {
-      synth.resume(); state = "playing"; setUI();
+      synth.resume(); state = "playing"; lockScreen(); setUI();
     }
   }
 
@@ -297,6 +316,82 @@
     setUI();
   }
 
+  /* ---- 音声ファイル(MP3)のプレイヤー: 画面ロック中・別アプリ使用中も再生できる ---- */
+  function audioUrl(noteUrl) {
+    return noteUrl.replace(/topics\/([^/]+)\/notes(\.html)?\/?$/, "audio/$1.mp3");
+  }
+  function exists(url) {
+    return fetch(url, { method: "HEAD" }).then(function (r) { return r.ok; }).catch(function () { return false; });
+  }
+  function audioPlayer(tracks, withList) {
+    var wrap = document.createElement("div");
+    wrap.style.cssText = "margin:.5rem 0 1rem;padding:.6rem .75rem;background:#eef6ff;border:1px solid #b6d4f2;border-radius:6px;font-size:.85rem;";
+    var head = document.createElement("div");
+    head.style.cssText = "margin-bottom:.4rem;font-weight:600;";
+    head.textContent = "🎧 音声ファイルで再生(画面ロック中も続きます)";
+    var au = document.createElement("audio");
+    au.controls = true; au.preload = "none"; au.style.cssText = "width:100%;";
+    var row = document.createElement("div");
+    row.style.cssText = "display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-top:.4rem;";
+    var cur = 0;
+    var arate = saved.arate || 1;
+
+    function load(i, play) {
+      cur = Math.max(0, Math.min(i, tracks.length - 1));
+      au.src = tracks[cur].src;
+      au.playbackRate = arate;
+      if (sel) sel.value = cur;
+      if ("mediaSession" in navigator && window.MediaMetadata) {
+        navigator.mediaSession.metadata = new MediaMetadata({ title: tracks[cur].title, artist: "Claude認定資格 学習ノート" });
+      }
+      if (play) au.play().catch(function () {});
+    }
+    au.addEventListener("loadedmetadata", function () { au.playbackRate = arate; });
+    au.addEventListener("play", function () { au.playbackRate = arate; });
+    au.addEventListener("ended", function () { if (cur < tracks.length - 1) load(cur + 1, true); });
+
+    var sel = null;
+    if (withList) {
+      sel = document.createElement("select");
+      sel.style.maxWidth = "100%";
+      tracks.forEach(function (t, i) {
+        var o = document.createElement("option");
+        o.value = i; o.textContent = t.title;
+        sel.appendChild(o);
+      });
+      sel.onchange = function () { load(parseInt(sel.value, 10), true); };
+      row.appendChild(mk("⏮ 前のノート", function () { load(cur - 1, true); }));
+      row.appendChild(mk("次のノート ⏭", function () { load(cur + 1, true); }));
+      row.appendChild(sel);
+    }
+    var sr = document.createElement("select");
+    [0.8, 1, 1.2, 1.5, 1.8, 2].forEach(function (r) {
+      var o = document.createElement("option");
+      o.value = r; o.textContent = "速度 ×" + r;
+      if (r === arate) o.selected = true;
+      sr.appendChild(o);
+    });
+    sr.onchange = function () {
+      arate = parseFloat(sr.value);
+      au.playbackRate = arate;
+      saved.arate = arate;
+      try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch (e) {}
+    };
+    row.appendChild(sr);
+
+    if ("mediaSession" in navigator) {
+      try {
+        navigator.mediaSession.setActionHandler("previoustrack", withList ? function () { load(cur - 1, true); } : null);
+        navigator.mediaSession.setActionHandler("nexttrack", withList ? function () { load(cur + 1, true); } : null);
+      } catch (e) {}
+    }
+    // ブラウザの読み上げと同時に鳴らないよう、音声ファイルの再生開始で読み上げを止める
+    au.addEventListener("play", function () { if (state !== "stopped") stop(); });
+    load(0, false);
+    wrap.appendChild(head); wrap.appendChild(au); wrap.appendChild(row);
+    return wrap;
+  }
+
   function init() {
     if (allBox) {
       var urls = (allBox.getAttribute("data-urls") || "").split(",").filter(Boolean);
@@ -312,6 +407,11 @@
           if (main) items = items.concat(collect(main, titles[n] || "", false));
         });
         build(allBox);
+        Promise.all(urls.map(function (u) { return exists(audioUrl(u)); })).then(function (oks) {
+          var tracks = [];
+          urls.forEach(function (u, n) { if (oks[n]) tracks.push({ title: titles[n] || ("ノート" + (n + 1)), src: audioUrl(u) }); });
+          if (tracks.length) allBox.insertBefore(audioPlayer(tracks, true), allBox.firstChild);
+        });
       }).catch(function () { allBox.textContent = "ノートの読み込みに失敗しました。"; });
     } else {
       var main = document.querySelector(".main-content");
@@ -319,6 +419,12 @@
       if (!h1) return;
       items = collect(main, "", true);
       build(null, h1);
+      var au = audioUrl(location.pathname);
+      if (au !== location.pathname) {
+        exists(au).then(function (ok) {
+          if (ok) h1.parentNode.insertBefore(audioPlayer([{ title: h1.textContent.trim(), src: au }], false), h1.nextSibling);
+        });
+      }
     }
   }
 

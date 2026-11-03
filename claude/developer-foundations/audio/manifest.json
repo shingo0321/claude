@@ -1,0 +1,10 @@
+{
+  "01-agents-and-workflows": "81adfce6a742ff5c",
+  "02-applications-and-integration": "fcaa38092ce930ef",
+  "03-claude-code": "8b00e2bb9cfa7dad",
+  "04-eval-testing-debugging": "ecd8959d557900a5",
+  "05-model-selection-optimization": "7710957058fdf9b2",
+  "06-prompt-context-engineering": "759f7d40b7bb2113",
+  "07-security-and-safety": "c04573dde27ce84a",
+  "08-tools-and-mcp": "418d7d39d437302c"
+}

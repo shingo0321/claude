@@ -783,18 +783,26 @@
 
     lines.push("");
     lines.push("## 不正解・未解答の問題の詳細");
+    lines.push("");
+    lines.push("凡例　●：正解、○：未選択、×：誤り");
     wrong.concat(skipped).forEach(function (q) {
-      var letters = function (arr) {
-        return arr.map(function (l) { return displayLetterOf(q, l); }).sort().join(", ");
-      };
       lines.push("");
       lines.push("### 問題ID " + q.id + " [" + q.domainLabel + "] " + (q.answered ? "不正解" : "未解答"));
       lines.push(plain(q.stemJa));
       q.options.forEach(function (o, i) {
-        lines.push("- " + String.fromCharCode(65 + i) + ". " + plain(o.ja));
+        var picked = !!q.picked && q.picked.indexOf(o.origLetter) !== -1;
+        var correct = q.correct.indexOf(o.origLetter) !== -1;
+        var mark = picked ? (correct ? "●" : "×") : correct ? "○" : "　";
+        lines.push(mark + " " + String.fromCharCode(65 + i) + ". " + plain(o.ja));
       });
-      lines.push("- 自分の回答: " + (q.picked && q.picked.length ? letters(q.picked) : "(未解答)"));
-      lines.push("- 正解: " + letters(q.correct));
+      lines.push("- 解説: " + plain(q.explanation));
+      if (q.runnerUp) lines.push("- 次点(" + displayLetterOf(q, q.runnerUp.letter) + "): " + plain(q.runnerUp.why));
+      if (q.others) {
+        Object.keys(q.others)
+          .sort(function (a, b) { return displayLetterOf(q, a) < displayLetterOf(q, b) ? -1 : 1; })
+          .forEach(function (k) { lines.push("- ほかの選択肢(" + displayLetterOf(q, k) + "): " + plain(q.others[k])); });
+      }
+      if (q.deep) lines.push("- 見分け方: " + plain(q.deep));
     });
     lines.push("");
     var subject = "[模擬試験結果] " + data.examTitle + " " + dateStr + " " + pct + "%";

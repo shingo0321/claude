@@ -11,6 +11,13 @@ permalink: /claude/architect-foundations/
 Anthropic公式の技術認定「Claude Certified Architect – Foundations」の学習用フォルダ。
 60問・120分の proctored 試験(シナリオ形式、6件のシナリオバンクから4件出題)。Claude Code / MCP / エージェント型アーキテクチャ / プロンプト設計 / コンテキスト管理の基礎知識を問う。試験はPearson VUE経由、Anthropic Partner Academyから申込。合格ライン: スケール100〜1000中720点。上位資格 [`../architect-professional/`](../architect-professional/) と内容面では関連するが、前提資格(必須の合格条件)ではない — Claude認定プログラムに他資格を前提とする試験はない。
 
+## 全ノートの音声読み上げ
+
+この試験の `topics/` のノートを、ドメイン順に続けて読み上げます(ブラウザ内蔵の音声合成を使用。コード・図は読み飛ばします)。
+
+{% assign ra_notes = site.pages | where_exp: "p", "p.path contains 'claude/architect-foundations/topics/'" | where: "name", "notes.md" | sort: "path" %}
+<div id="read-aloud-all" data-urls="{% for p in ra_notes %}{{ p.url | relative_url }},{% endfor %}" data-titles="{% for p in ra_notes %}{{ p.title }}|{% endfor %}"></div>
+
 ## フォルダ構成
 
 - `topics/` — 試験範囲(5ドメイン)ごとのノート

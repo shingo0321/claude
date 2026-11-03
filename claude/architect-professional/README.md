@@ -27,6 +27,13 @@ Claude認定プログラムの中で最も配点の分散が緩やか(最小7%�
 | 6 | Stakeholder Communication & Lifecycle Management | 14% | `topics/06-stakeholder-communication-lifecycle/` |
 | 7 | Developer Productivity & Operational Enablement | 7%(最小) | `topics/07-developer-productivity-operational-enablement/` |
 
+## 全ノートの音声読み上げ
+
+この試験の `topics/` のノートを、ドメイン順に続けて読み上げます(ブラウザ内蔵の音声合成を使用。コード・図は読み飛ばします)。
+
+{% assign ra_notes = site.pages | where_exp: "p", "p.path contains 'claude/architect-professional/topics/'" | where: "name", "notes.md" | sort: "path" %}
+<div id="read-aloud-all" data-urls="{% for p in ra_notes %}{{ p.url | relative_url }},{% endfor %}" data-titles="{% for p in ra_notes %}{{ p.title }}|{% endfor %}"></div>
+
 ## フォルダ構成
 
 - `topics/` — 上表7ドメインごとのノート(各`notes.md`)

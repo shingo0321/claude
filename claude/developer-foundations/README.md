@@ -26,6 +26,13 @@ Anthropic公式の技術認定「Claude Certified Developer – Foundations」(C
 | 03 | Claude Code | 3.1% |
 | 04 | Eval, Testing, and Debugging | 2.6% |
 
+## 全ノートの音声読み上げ
+
+この試験の `topics/` のノートを、ドメイン順に続けて読み上げます(ブラウザ内蔵の音声合成を使用。コード・図は読み飛ばします)。
+
+{% assign ra_notes = site.pages | where_exp: "p", "p.path contains 'claude/developer-foundations/topics/'" | where: "name", "notes.md" | sort: "path" %}
+<div id="read-aloud-all" data-urls="{% for p in ra_notes %}{{ p.url | relative_url }},{% endfor %}" data-titles="{% for p in ra_notes %}{{ p.title }}|{% endfor %}"></div>
+
 ## フォルダ構成
 
 - `topics/` — 試験範囲ごとのノート（ドメイン番号順）

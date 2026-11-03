@@ -11,6 +11,13 @@ permalink: /claude/associate-foundations/
 Anthropic公式の技術認定「Claude Certified Associate – Foundations」(CCAO-F)の学習用フォルダ。
 60問・120分の proctored 試験。開発者向けではなく、業務・生産性ユーザー向けにClaudeを使いこなすための知識(プロンプト設計、出力評価、製品/モデル選定、ワークフロー統合、設定・ナレッジ管理、ガバナンス・責任あるAI利用、トラブルシューティング)を問う。試験はPearson VUE経由、Anthropic Partner Academyから申込。合格ライン: スケール100〜1000中720点。
 
+## 全ノートの音声読み上げ
+
+この試験の `topics/` のノートを、ドメイン順に続けて読み上げます(ブラウザ内蔵の音声合成を使用。コード・図は読み飛ばします)。
+
+{% assign ra_notes = site.pages | where_exp: "p", "p.path contains 'claude/associate-foundations/topics/'" | where: "name", "notes.md" | sort: "path" %}
+<div id="read-aloud-all" data-urls="{% for p in ra_notes %}{{ p.url | relative_url }},{% endfor %}" data-titles="{% for p in ra_notes %}{{ p.title }}|{% endfor %}"></div>
+
 ## 出題分野(ドメイン)
 
 | # | ドメイン | 出題比率 |

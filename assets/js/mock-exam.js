@@ -856,14 +856,15 @@
     lines.push("- 正答数: " + result.correctCount + " / " + result.total + " (" + pct + "%)");
     lines.push("- スケールスコア目安: " + scaled + " / " + data.scoreMax + " (合格ライン " + data.passScore + "): " + (pass ? "到達" : "未到達"));
     lines.push("");
-    lines.push("## 分野別正答率");
+    lines.push("## 分野別正答率(★は合格ライン相当を下回る分野)");
     lines.push("");
-    lines.push("| 分野 | 正答 | 正答率 | 公式配点比率 |");
-    lines.push("|---|---|---|---|");
+    var passRate = (data.passScore - data.scoreMin) / (data.scoreMax - data.scoreMin);
     Object.keys(result.domainStats).sort().forEach(function (label) {
       var s = result.domainStats[label];
       var w = data.domainWeights ? data.domainWeights[domainKey(label)] : null;
-      lines.push("| " + label + " | " + s.correct + "/" + s.total + " | " + (s.total ? Math.round((s.correct / s.total) * 100) + "%" : "-") + " | " + (w != null ? w + "%" : "-") + " |");
+      var low = s.total && s.correct / s.total < passRate;
+      lines.push("- " + label + ": " + s.correct + "/" + s.total + " (" + (s.total ? Math.round((s.correct / s.total) * 100) + "%" : "-") + ")"
+        + (w != null ? " ・配点" + w + "%" : "") + (low ? " ★要復習" : ""));
     });
     var wrong = result.questions.filter(function (q) { return q.answered && !q.isCorrect; });
     var skipped = result.questions.filter(function (q) { return !q.answered; });

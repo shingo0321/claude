@@ -25,6 +25,31 @@
     return t.replace(/`/g, "").replace(/https?:\/\/\S+/g, "リンク").replace(/\s+/g, " ").trim();
   }
 
+  // 読み辞書(read-aloud-dict.js)を適用して、読み上げ用の文字列にする。画面の表示は変えない。
+  var dictMap = null, dictRe = null;
+  var LETTERS = { A: "エー", B: "ビー", C: "シー", D: "ディー", E: "イー", F: "エフ", G: "ジー", H: "エイチ", I: "アイ", J: "ジェイ", K: "ケー", L: "エル", M: "エム", N: "エヌ", O: "オー", P: "ピー", Q: "キュー", R: "アール", S: "エス", T: "ティー", U: "ユー", V: "ブイ", W: "ダブリュー", X: "エックス", Y: "ワイ", Z: "ゼット" };
+  function buildDict() {
+    var d = window.READ_ALOUD_DICT || {};
+    dictMap = {};
+    var keys = Object.keys(d);
+    keys.forEach(function (k) { dictMap[k.toLowerCase()] = d[k]; });
+    keys.sort(function (x, y) { return y.length - x.length; });
+    if (keys.length) {
+      var esc = keys.map(function (k) { return k.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&"); });
+      dictRe = new RegExp("(^|[^A-Za-z0-9])(" + esc.join("|") + ")(?![A-Za-z0-9])", "gi");
+    }
+  }
+  function pron(text) {
+    if (dictMap === null) buildDict();
+    var t = text;
+    if (dictRe) t = t.replace(dictRe, function (m, pre, w) { return pre + (dictMap[w.toLowerCase()] || w); });
+    // 辞書にない英大文字の略語はアルファベット読み
+    t = t.replace(/(^|[^A-Za-z0-9])([A-Z]{2,6})(?![A-Za-z0-9])/g, function (m, pre, w) {
+      return pre + w.split("").map(function (c) { return LETTERS[c]; }).join("");
+    });
+    return t.replace(/_/g, " ");
+  }
+
   function collect(main, note, live) {
     var out = [];
     main.querySelectorAll("h1,h2,h3,h4,p,li,tr").forEach(function (el) {
@@ -50,7 +75,7 @@
   function pickVoice() {
     var voices = synth.getVoices().filter(function (v) { return /^ja/i.test(v.lang); });
     if (!voices.length) return null;
-    var byName = voices.filter(function (v) { return v.name === saved.voice; })[0];
+    var byName = voices.filter(function (v) { return (v.voiceURI || v.name) === saved.voice; })[0];
     // 自動選択: 高品質(Natural/Neural/Siri/拡張)→ 代表的な声 → 先頭の順
     var hq = voices.filter(function (v) { return /Natural|Neural|Siri|Enhanced|Premium|拡張|Nanami/i.test(v.name); });
     var pref = voices.filter(function (v) { return /Google|Kyoko|Haruka|Otoya/i.test(v.name); });
@@ -98,7 +123,7 @@
     setUI();
     var tried = 0;
     function say(useVoice) {
-      var u = new SpeechSynthesisUtterance(it.text);
+      var u = new SpeechSynthesisUtterance(pron(it.text));
       lastUtter = u; // GCで終了イベントが失われるのを防ぐ
       u.lang = "ja-JP";
       var v = useVoice ? pickVoice() : null;
@@ -216,11 +241,21 @@
       var auto = document.createElement("option");
       auto.value = ""; auto.textContent = list.length ? "声: 自動" : "声: (日本語の声なし)";
       selVoice.appendChild(auto);
+      var seen = {};
       list.forEach(function (v) {
+        var id = v.voiceURI || v.name;
+        var base = v.name.replace(/ - Japanese.*$/, "").replace(/^Microsoft /, "");
+        var label = base;
+        // 同名の声は、URI末尾(品質など)や通番で見分ける
+        if (seen[base]) {
+          var tail = (v.voiceURI || "").split(/[./]/).pop();
+          label += " (" + (tail && tail !== v.name ? tail : "別版" + seen[base]) + ")";
+        }
+        seen[base] = (seen[base] || 1) + 1;
         var o = document.createElement("option");
-        o.value = v.name;
-        o.textContent = v.name.replace(/ - Japanese.*$/, "").replace(/^Microsoft /, "");
-        if (saved.voice === v.name) o.selected = true;
+        o.value = id;
+        o.textContent = label;
+        if (saved.voice === id) o.selected = true;
         selVoice.appendChild(o);
       });
       if (!saved.voice) selVoice.value = "";

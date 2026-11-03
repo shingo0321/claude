@@ -18,6 +18,7 @@
   var state = "stopped"; // stopped | playing | paused
   var token = 0;
   var rate = saved.rate || 1;
+  var lastUtter = null;
 
   function clean(t) {
     return t.replace(/`/g, "").replace(/https?:\/\/\S+/g, "リンク").replace(/\s+/g, " ").trim();
@@ -78,14 +79,30 @@
     var it = items[idx];
     highlight(it.el);
     setUI();
-    var u = new SpeechSynthesisUtterance(it.text);
-    u.lang = "ja-JP";
-    var v = pickVoice();
-    if (v) u.voice = v;
-    u.rate = rate;
-    u.onend = function () { if (my === token && state === "playing") { idx++; speakNext(my); } };
-    u.onerror = function (e) { if (my === token && e.error !== "canceled" && e.error !== "interrupted") stop(); };
-    synth.speak(u);
+    var tried = 0;
+    function say(useVoice) {
+      var u = new SpeechSynthesisUtterance(it.text);
+      lastUtter = u; // GCで終了イベントが失われるのを防ぐ
+      u.lang = "ja-JP";
+      var v = useVoice ? pickVoice() : null;
+      if (v) u.voice = v;
+      u.rate = rate;
+      var started = false;
+      u.onstart = function () { started = true; };
+      u.onend = function () { if (my === token && state === "playing") { idx++; speakNext(my); } };
+      u.onerror = function (e) {
+        if (my !== token || e.error === "canceled" || e.error === "interrupted") return;
+        if (useVoice && !tried++) { say(false); return; } // 声指定を外して再試行
+        stop();
+        info.textContent = "読み上げエラー: " + e.error;
+      };
+      synth.speak(u);
+      // 無音のまま始まらない場合の保険(再開してから既定の声でやり直す)
+      setTimeout(function () {
+        if (my === token && state === "playing" && !started && !synth.speaking) { synth.cancel(); if (!tried++) say(false); }
+      }, 2500);
+    }
+    say(true);
   }
 
   function playFrom(i) {

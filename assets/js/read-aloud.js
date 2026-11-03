@@ -107,12 +107,12 @@
 
   function playFrom(i) {
     token++;
-    synth.cancel();
+    if (synth.speaking || synth.pending) synth.cancel();
     idx = Math.max(0, Math.min(i, items.length - 1));
     state = "playing";
     setUI();
-    var my = token;
-    setTimeout(function () { speakNext(my); }, 60);
+    // Safariはユーザー操作の中で直接speak()しないと無音になるため、遅延させず同期で呼ぶ
+    speakNext(token);
   }
 
   function stop() {

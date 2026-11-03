@@ -785,6 +785,8 @@
     lines.push("- 不正解 (" + wrong.length + "問): " + ids(wrong));
     lines.push("- 未解答 (" + skipped.length + "問): " + ids(skipped));
     var summary = lines.join("\n");
+    // 添付(full)には学習ノートのリンクを入れない(リンクはメール本文の要約だけ)
+    lines = lines.filter(function (l) { return l.indexOf("  学習ノート: ") !== 0; });
 
     lines.push("");
     lines.push("## 不正解・未解答の問題の詳細");

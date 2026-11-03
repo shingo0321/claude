@@ -133,6 +133,8 @@
     + "#mock-exam-app .me-fig-table th, #mock-exam-app .me-fig-table td { border: 1px solid #d0d7de; padding: 0.3rem 0.5rem; text-align: left; vertical-align: top; }\n"
     + "#mock-exam-app .me-fig-table th { background: #eaeef2; }\n"
     + "#mock-exam-app .me-fig-table td.key { background: #ddf4ff; font-weight: 600; }\n"
+    + "#mock-exam-app .me-mail { border: 1px solid #d0d7de; border-radius: 10px; padding: 0.8rem 1rem; margin: 0 0 1.2rem; background: #f6f8fa; }\n"
+    + "#mock-exam-app .me-mail-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0.5rem 0; }\n"
     + "@media (max-width: 640px) {\n"
     + "  #mock-exam-app .me-intro dl { grid-template-columns: 1fr; }\n"
     + "}\n";
@@ -617,6 +619,7 @@
         return i.value;
       });
     var correctSet = q.correct;
+    q.picked = checked;
     q.answered = checked.length > 0;
     q.isCorrect =
       checked.length === correctSet.length && checked.every(function (v) {
@@ -741,7 +744,100 @@
       }
     });
 
-    return { correctCount: correctCount, total: questions.length, domainStats: domainStats, scenarioStats: scenarioStats, review: review };
+    return { correctCount: correctCount, total: questions.length, domainStats: domainStats, scenarioStats: scenarioStats, review: review, questions: questions };
+  }
+
+  // Claudeに読み込ませる結果レポート(Markdown)。不正解・未解答の問題は、問題文・選択肢・自分の回答・正解まで含める。
+  function buildReport(data, result, scaled, pass) {
+    var d = new Date();
+    var pad = function (n) { return n < 10 ? "0" + n : String(n); };
+    var dateStr = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    var plain = function (s) { return String(s).replace(/`([^`]+)`/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1"); };
+    var pct = Math.round((result.correctCount / result.total) * 100);
+    var lines = [];
+    lines.push("# 模擬試験結果: " + data.examTitle + " (" + dateStr + ")");
+    lines.push("");
+    lines.push("- 正答数: " + result.correctCount + " / " + result.total + " (" + pct + "%)");
+    lines.push("- スケールスコア目安: " + scaled + " / " + data.scoreMax + " (合格ライン " + data.passScore + "): " + (pass ? "到達" : "未到達"));
+    lines.push("");
+    lines.push("## 分野別正答率");
+    lines.push("");
+    lines.push("| 分野 | 正答 | 正答率 | 公式配点比率 |");
+    lines.push("|---|---|---|---|");
+    Object.keys(result.domainStats).sort().forEach(function (label) {
+      var s = result.domainStats[label];
+      var w = data.domainWeights ? data.domainWeights[domainKey(label)] : null;
+      lines.push("| " + label + " | " + s.correct + "/" + s.total + " | " + (s.total ? Math.round((s.correct / s.total) * 100) + "%" : "-") + " | " + (w != null ? w + "%" : "-") + " |");
+    });
+    var missed = result.questions.filter(function (q) { return !q.isCorrect; });
+    lines.push("");
+    lines.push("## 不正解・未解答の問題 (" + missed.length + "問)");
+    missed.forEach(function (q) {
+      var letters = function (arr) {
+        return arr.map(function (l) { return displayLetterOf(q, l); }).sort().join(", ");
+      };
+      lines.push("");
+      lines.push("### " + q.id + " [" + q.domainLabel + "] " + (q.answered ? "不正解" : "未解答"));
+      lines.push(plain(q.stemJa));
+      q.options.forEach(function (o, i) {
+        lines.push("- " + String.fromCharCode(65 + i) + ". " + plain(o.ja));
+      });
+      lines.push("- 自分の回答: " + (q.picked && q.picked.length ? letters(q.picked) : "(未解答)"));
+      lines.push("- 正解: " + letters(q.correct));
+    });
+    lines.push("");
+    lines.push("---");
+    lines.push("上の模擬試験結果を分析して、弱点の傾向と、復習すべき学習ノート・次の学習計画を教えてください。");
+    return { subject: "[模擬試験結果] " + data.examTitle + " " + dateStr + " " + pct + "%", body: lines.join("\n") };
+  }
+
+  // 結果の受け渡し(外部サービスなし): コピー / .mdダウンロード / メールアプリ起動(mailto)。
+  // 宛先は、ユーザーが入力した値をこのブラウザのlocalStorageにだけ保存する(サイトには載せない)。
+  function renderMailBox(panel, report) {
+    var KEY = "mockExamMailTo";
+    var saved = "";
+    try { saved = localStorage.getItem(KEY) || ""; } catch (e) {}
+    var box = document.createElement("div");
+    box.className = "me-mail";
+    box.innerHTML =
+      '<strong>結果をClaudeで分析する</strong>'
+      + '<div class="me-mail-actions">'
+      + '<button type="button" class="me-btn" id="me-copy-btn">Claude用にコピー</button>'
+      + '<button type="button" class="me-btn me-btn-secondary" id="me-dl-btn">.mdでダウンロード</button>'
+      + "</div>"
+      + '<div class="me-mail-actions">'
+      + '<input type="email" id="me-mail-to" placeholder="自分のメールアドレス" value="' + escapeHtml(saved) + '" style="flex:1;min-width:12rem;padding:0.4rem;border:1px solid #d0d7de;border-radius:6px;">'
+      + '<button type="button" class="me-btn me-btn-secondary" id="me-mailto-btn">メールアプリで作成</button>'
+      + "</div>"
+      + '<p class="me-note" id="me-mail-status">コピーしてClaudeに貼り付けるか、メールで自分宛てに送っておき、Claudeに「模擬試験結果メールを読んで分析して」と頼めます。メールアプリで作成する方法は、本文が長いと途中で切れるため、全文は「コピー」か「ダウンロード」を使ってください。</p>';
+    panel.insertAdjacentElement("afterend", box);
+    var status = box.querySelector("#me-mail-status");
+    box.querySelector("#me-copy-btn").addEventListener("click", function () {
+      var done = function () { status.textContent = "コピーしました。Claudeに貼り付けてください。"; };
+      var fail = function () { status.textContent = "コピーに失敗しました。ダウンロードを使ってください。"; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(report.body).then(done, fail);
+      else fail();
+    });
+    box.querySelector("#me-dl-btn").addEventListener("click", function () {
+      var blob = new Blob([report.body], { type: "text/markdown;charset=utf-8" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = report.subject.replace(/[\/:*?"<>|\s]+/g, "_") + ".md";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      status.textContent = "ダウンロードしました。Claudeに添付するか、メールに添付して送ってください。";
+    });
+    box.querySelector("#me-mailto-btn").addEventListener("click", function () {
+      var to = box.querySelector("#me-mail-to").value.trim();
+      try { localStorage.setItem(KEY, to); } catch (e) {}
+      var MAX = 1500;
+      var body = report.body.length > MAX
+        ? report.body.slice(0, MAX) + "\n\n(長いため途中までです。全文は「コピー」または「ダウンロード」を使ってください)"
+        : report.body;
+      location.href = "mailto:" + encodeURIComponent(to) + "?subject=" + encodeURIComponent(report.subject) + "&body=" + encodeURIComponent(body);
+    });
   }
 
   function renderResultPanel(root, data, result) {
@@ -836,6 +932,8 @@
       scTable.innerHTML = "<thead><tr><th>シナリオ</th><th>正答数</th><th>正答率</th></tr></thead><tbody>" + scRows + "</tbody>";
       note.insertAdjacentElement("afterend", scTable);
     }
+
+    renderMailBox(panel, buildReport(data, result, scaled, pass));
 
     panel.querySelector("#me-retry-btn").addEventListener("click", function () {
       startAttempt(root, data);

@@ -15,5 +15,6 @@ Claude認定プログラムの学習ノート、gitリポジトリ(`shingo0321/c
 
 - `<試験>/mock-exam/mock-exam-data.js` — 模擬試験の問題データ(エンジンは`assets/js/mock-exam.js`)。各問は`explanation`(正答の理由)に加え、`runnerUp`(次点: `{letter, why}`)・`others`(ほかの誤答の理由: 文字→理由)・任意の`deep`(見分け方)・`fig`(図: `steps`/`end`/`back`のフロー、または`kind:"table"`の表)を持つ。文字はデータ中の元の文字で、エンジンが選択肢のシャッフル後の表示文字に変換するので、`explanation`の本文に「Bは…」のように選択肢の文字を書かないこと。問題を足したり正答を変えたら、`practice-questions/README.md`(同じ内容を`次点`・`ほかの選択肢`込みで掲載)と、各試験の`overview.md`も合わせて更新する。
 
+- 模擬試験の結果の受け渡し — 結果画面の「Claude用にコピー」「.mdでダウンロード」「メールアプリで作成(mailto)」が、不正解・未解答の問題(問題文・選択肢・自分の回答・正解)を含むMarkdownレポートを出力する(`assets/js/mock-exam.js`の`buildReport`・`renderMailBox`)。外部サービスは使わない。宛先はユーザーが入力し、そのブラウザのlocalStorageにだけ保存する(サイトには載せない)。mailtoは本文が長いと1500字で切れるため、全文はコピーかダウンロードを使う。メールで送った場合は、Claudeに「模擬試験結果メールを読んで分析して」と頼む(Gmail連携で件名`[模擬試験結果]`を検索する)。
 - これは親ワークスペース`c:\Users\snows\Claude\`(それ自体はgitリポジトリではない)・`study/ipa/`・`study/english/`とは別のgitリポジトリである。
 - 内容は日本語で書かれている。

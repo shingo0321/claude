@@ -4,7 +4,7 @@ title: 覚える内容の俯瞰図
 parent: "Architect – Professional"
 nav_order: 0
 description: "Architect – Professional の7ドメインで覚える具体的な内容(正答の型)を、図と表で整理したページ"
-permalink: /claude/architect-professional/overview/
+permalink: /architect-professional/overview/
 ---
 
 # Architect – Professional: 覚える内容の俯瞰図

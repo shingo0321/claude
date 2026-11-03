@@ -4,7 +4,7 @@ title: 覚える内容の俯瞰図
 parent: "Developer – Foundations"
 nav_order: 0
 description: "Developer – Foundations の8ドメインで覚える具体的な内容(正答の型)を、図と表で整理したページ"
-permalink: /claude/developer-foundations/overview/
+permalink: /developer-foundations/overview/
 ---
 
 # Developer – Foundations: 覚える内容の俯瞰図

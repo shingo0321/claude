@@ -4,7 +4,7 @@ title: 覚える内容の俯瞰図
 parent: "Associate – Foundations"
 nav_order: 0
 description: "Associate – Foundations の7ドメインで覚える具体的な内容(正答の型)を、図と表で整理したページ"
-permalink: /claude/associate-foundations/overview/
+permalink: /associate-foundations/overview/
 ---
 
 # Associate – Foundations: 覚える内容の俯瞰図

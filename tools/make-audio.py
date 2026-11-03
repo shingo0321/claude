@@ -6,7 +6,7 @@
     python tools/make-audio.py --force          # すべて作り直す
     python tools/make-audio.py associate-foundations   # 試験を絞る
 
-出力: claude/<試験>/audio/<ドメインのフォルダ名>.mp3 と manifest.json(ハッシュ。変更検知用)。
+出力: <試験>/audio/<ドメインのフォルダ名>.mp3 と manifest.json(ハッシュ。変更検知用)。
 読み方は assets/js/read-aloud-dict.js(ブラウザ読み上げと共通の読み辞書)を使う。
 """
 import asyncio
@@ -151,7 +151,7 @@ def main():
     force = "--force" in sys.argv
     exams = args or EXAMS
     for exam in exams:
-        base = ROOT / "claude" / exam
+        base = ROOT / exam
         mpath = base / "audio" / "manifest.json"
         manifest = json.loads(mpath.read_text(encoding="utf-8")) if mpath.exists() else {}
         for notes in sorted((base / "topics").glob("*/notes.md")):

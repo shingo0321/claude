@@ -1,5 +1,5 @@
 /*
- * 模擬試験エンジン(共通)。study/claude/<exam>/mock-exam/ 配下の各ページから、
+ * 模擬試験エンジン(共通)。<exam>/mock-exam/ 配下の各ページから、
  * その試験専用の mock-exam-data.js (window.MOCK_EXAM_DATA を定義) と合わせて読み込む。
  */
 (function () {

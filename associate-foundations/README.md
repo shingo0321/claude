@@ -3,7 +3,7 @@ layout: default
 title: Associate – Foundations
 nav_order: 3
 has_children: true
-permalink: /claude/associate-foundations/
+permalink: /associate-foundations/
 ---
 
 # Claude Certified Associate – Foundations 勉強用プロジェクト

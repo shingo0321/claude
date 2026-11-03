@@ -3,7 +3,7 @@ layout: default
 title: Developer – Foundations
 nav_order: 4
 has_children: true
-permalink: /claude/developer-foundations/
+permalink: /developer-foundations/
 ---
 
 # Claude Certified Developer – Foundations 勉強用プロジェクト

@@ -4,7 +4,7 @@ title: 覚える内容の俯瞰図
 parent: "Architect – Foundations"
 nav_order: 0
 description: "Architect – Foundations の5ドメインで覚える具体的な内容(正答の型)を、図と表で整理したページ"
-permalink: /claude/architect-foundations/overview/
+permalink: /architect-foundations/overview/
 ---
 
 # Architect – Foundations: 覚える内容の俯瞰図

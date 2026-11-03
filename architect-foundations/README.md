@@ -3,7 +3,7 @@ layout: default
 title: Architect – Foundations
 nav_order: 5
 has_children: true
-permalink: /claude/architect-foundations/
+permalink: /architect-foundations/
 ---
 
 # Claude Certified Architect – Foundations 勉強用プロジェクト

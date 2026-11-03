@@ -3,7 +3,7 @@ layout: default
 title: Architect – Professional
 nav_order: 6
 has_children: true
-permalink: /claude/architect-professional/
+permalink: /architect-professional/
 ---
 
 # Claude Certified Architect – Professional 勉強用プロジェクト
